@@ -176,7 +176,13 @@ public class DNSLookupService {
         }
 
         // TODO To be completed by the student
+        // Need a recursive call
+        // increment indirectionLevel by 1 for each recursion
+        // if response resloves to CNAME, get result
+        // else recurse
 
+
+        //just make sure you return a Set of ResourceRecords
         return cache.getCachedResults(node);
     }
 
