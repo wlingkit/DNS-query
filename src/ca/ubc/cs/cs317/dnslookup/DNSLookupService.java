@@ -1,11 +1,14 @@
 package ca.ubc.cs.cs317.dnslookup;
 
 import java.io.Console;
+import java.io.IOException;
+import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.*;
+
 
 public class DNSLookupService {
 
@@ -17,8 +20,9 @@ public class DNSLookupService {
     private static DatagramSocket socket;
 
     private static DNSCache cache = DNSCache.getInstance();
-
     private static Random random = new Random();
+
+    
 
     /**
      * Main function, called when program is first invoked.
@@ -53,6 +57,7 @@ public class DNSLookupService {
         Scanner in = new Scanner(System.in);
         Console console = System.console();
         do {
+            System.out.println("input is " + console);
             // Use console if one is available, or standard input if not.
             String commandLine;
             if (console != null) {
@@ -169,18 +174,25 @@ public class DNSLookupService {
      * @return A set of resource records corresponding to the specific query requested.
      */
     private static Set<ResourceRecord> getResults(DNSNode node, int indirectionLevel) {
-
+        // check if cache has it
         if (indirectionLevel > MAX_INDIRECTION_LEVEL) {
             System.err.println("Maximum number of indirection levels reached.");
             return Collections.emptySet();
         }
-
+        retrieveResultsFromServer(node, rootServer);
+        
         // TODO To be completed by the student
         // Need a recursive call
+        // Send message 
         // increment indirectionLevel by 1 for each recursion
         // if response resloves to CNAME, get result
         // else recurse
 
+
+
+        // Caching response
+        // ResourceRecord resource_record = new ResourceRecord(hostName, type, ttl, result);
+        // cache.addResult(resource_record);
 
         //just make sure you return a Set of ResourceRecords
         return cache.getCachedResults(node);
@@ -194,9 +206,16 @@ public class DNSLookupService {
      * @param node   Host name and record type to be used for the query.
      * @param server Address of the server to be used for the query.
      */
-    private static void retrieveResultsFromServer(DNSNode node, InetAddress server) {
+    private static void retrieveResultsFromServer(DNSNode node, InetAddress server){
 
         // TODO To be completed by the student
+        // repeated with a new server if the provided one is non-authoritative. That means AA=0
+
+
+        byte[] encoded_message = DNSQuery.encoding(node);
+        send_message(encoded_message, server, DEFAULT_DNS_PORT);
+        retrieve_message();
+        //Print? Trace?
     }
 
     private static void verbosePrintResourceRecord(ResourceRecord record, int rtype) {
@@ -222,4 +241,62 @@ public class DNSLookupService {
                     node.getType(), record.getTTL(), record.getTextResult());
         }
     }
+
+
+
+
+    // Send up message and obtaining the response
+    private static String send_message(byte[] message, InetAddress server, int port){
+        DatagramPacket out = new DatagramPacket(message, message.length, server, port);
+        socket.connect(server, port);
+
+        try{
+            socket.send(out);
+            System.out.println("Socket sent");
+        } catch (IOException e){
+            e.printStackTrace();  
+            System.out.println("IOException at socket sending");
+        }
+
+
+        
+        System.out.println("DatagramPacket data string");
+        String questionStr = ByteHelper.bytesToHex(out.getData());
+        System.out.println(questionStr);
+
+        
+
+        //TODO
+        return "Hi";
+    }
+
+
+    private static String retrieve_message(){
+        byte[] recieve_buffer = new byte[1024];
+        DatagramPacket dp = new DatagramPacket(recieve_buffer, recieve_buffer.length);
+        try{
+            socket.receive(dp);
+            System.out.println("Socket recieved");
+        } catch (IOException e){
+            e.printStackTrace();  
+            System.out.println("IOException at socket recieving");
+        }
+
+        //Helper bits to hex
+        byte received[] = dp.getData();
+        String response = new String(received);
+
+        // String[] hex = response.split("(?<=\\G..)");
+        String responseStr = ByteHelper.bytesToHex(dp.getData());
+        System.out.println("responseStr");
+        System.out.println(responseStr);
+        DNSResponse.decoding(responseStr);
+        
+        return "";
+    }
+
+    
+ 
+
+ 
 }

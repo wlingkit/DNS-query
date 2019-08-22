@@ -4,6 +4,9 @@ package ca.ubc.cs.cs317.dnslookup;
  * fully supported by this application.
  */
 public enum RecordType {
+    // ipv4 - A
+    // ipv6 - AAAA
+    // doesnt exist - SOA
     A(1), NS(2), CNAME(5), SOA(6), MX(15), AAAA(28), OTHER(0);
 
     private int code;
