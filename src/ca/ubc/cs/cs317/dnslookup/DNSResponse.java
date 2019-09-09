@@ -5,7 +5,18 @@ import java.util.*;
 
 
 public class DNSResponse extends DNSQuery{
-    static int hexStr_bytePointer = 0;  
+    
+    public static List<HashMap<String, String>> A_info = new ArrayList<HashMap<String, String>>();
+    public static List<HashMap<String, String>> AAAA_info = new ArrayList<HashMap<String, String>>();
+    public static List<HashMap<String, String>> NS_info = new ArrayList<HashMap<String, String>>();
+    public static List<HashMap<String, String>> CNAME_info = new ArrayList<HashMap<String, String>>();
+    public static List<HashMap<String, String>> MX_info = new ArrayList<HashMap<String, String>>();
+    public static List<HashMap<String, String>> SOA_info = new ArrayList<HashMap<String, String>>();
+    public static List<HashMap<String, String>> OTHER_info = new ArrayList<HashMap<String, String>>();
+
+    // Keep track if server is authoritative
+    public static boolean is_AA = false; 
+
     //Decoding message 
     //Have a global variable to indicate where you are
     // -------------Question------------
@@ -32,11 +43,23 @@ public class DNSResponse extends DNSQuery{
         // if 02, C0 is a pointer and end with 00 
     public static void decoding(String message){
         // TODO cant skip. Need to find Number of server name and number of additional info
+        int hexStr_bytePointer = 0;
 
         int ID_OFFSET = 0;
         hexStr_bytePointer+=4;
 
         int QR_OFFSET = 4;
+        // aa is at index 5 in the 16 bits
+        // TODO figure out if server is authoritative 
+        System.out.println("AT DECODING");
+        System.out.println(hexStr_bytePointer);
+        String QRStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
+        int QRInt = Integer.parseInt(QRStr, 16);
+        String QRBinary = Integer.toBinaryString(QRInt); 
+        char is_authoritative = QRBinary.charAt(5);
+        if(is_authoritative == '1'){
+            is_AA = true;
+        }        
         hexStr_bytePointer+=4;
 
         int QDCOUNT_OFFSET = 8;
@@ -60,8 +83,8 @@ public class DNSResponse extends DNSQuery{
         while(!pointerStr.equals("00")){
             hexStr_bytePointer+=2;
             pointerStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
-            // TODO Print QNAME? 
         }
+        System.out.println(hexStr_bytePointer);
         // Shifting byte after getting "00"
         hexStr_bytePointer+=2;
 
@@ -72,43 +95,43 @@ public class DNSResponse extends DNSQuery{
         hexStr_bytePointer+=4;
 
 
-        HashMap<String, String> decodedInfo = new HashMap<String, String>();
+        
         // Iterating through name servers 
         // The two cases
         // C013 0002 0001 0002A300 0014 0161 0C 67746C642D73657276657273036E657400
         // C013 0002 0001 0002A300 0004 0163 C0 2A
+        System.out.println(name_server_count);
         for(int ns=0; ns < name_server_count; ns++){
+            HashMap<String, String> nameServerInfo = new HashMap<String, String>();
             // Common things of the two
             // Name server
-            System.out.println("At the start");
-            System.out.println(hexStr_bytePointer);
             String qname = "";
             hexStr_bytePointer+=2;
             String qnamepointerStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
             int qnamepointer = Integer.parseInt(qnamepointerStr, 16)*2;
             qname = pointerString(qnamepointer, message, qname);
             qname = qname.substring(0, qname.length() - 1);
-            System.out.println(qname);
-            System.out.println("qname");
+            nameServerInfo.put("qname", qname);
             hexStr_bytePointer+=2;
 
             // Type
             String typeStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
             int typeInt = Integer.parseInt(typeStr, 16);
-            decodedInfo.put("type", Integer.toString(typeInt));
+            String recordType = Integer.toString(typeInt);
+            nameServerInfo.put("type", recordType);
             hexStr_bytePointer += 4;
 
             // Class
             String classStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
             int classInt = Integer.parseInt(classStr, 16);
-            decodedInfo.put("class", Integer.toString(classInt));
+            nameServerInfo.put("class", Integer.toString(classInt));
             hexStr_bytePointer += 4;
 
 
             // TTL
             String TTLStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+8);
             int TTLInt = Integer.parseInt(TTLStr, 16);
-            decodedInfo.put("TTL", Integer.toString(TTLInt));
+            nameServerInfo.put("TTL", Integer.toString(TTLInt));
             hexStr_bytePointer += 8;
 
             // RLength
@@ -118,7 +141,7 @@ public class DNSResponse extends DNSQuery{
 
             // RData
             String Rdata = "";        
-            
+            System.out.println(RLength);
             for(int j=0; j < RLength; j++){
                 String datatempStr =  message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
                 int datatempInt = Integer.parseInt(datatempStr, 16);
@@ -150,39 +173,86 @@ public class DNSResponse extends DNSQuery{
             }
             // Removing extra "."
             Rdata = Rdata.substring(0, Rdata.length() - 2);
-            System.out.println(Rdata);
+            nameServerInfo.put("Rdata", Rdata);
+
+            // TODO
+            nameServerInfo.put("visited", "false");
+            // Put each type in different list
+            // Type A
+            switch(nameServerInfo.get("type")){
+                // Type A
+                case "1":
+                    A_info.add(nameServerInfo);
+                    break;
+                // Type NS
+                case "2":
+                    NS_info.add(nameServerInfo);
+                    break;
+                // Type CNAME
+                case "5":
+                    CNAME_info.add(nameServerInfo);
+                    break;
+                // TYPE SOA
+                case "6":
+                    SOA_info.add(nameServerInfo);
+                    break;
+                // Type MX
+                case "15":
+                    MX_info.add(nameServerInfo);
+                    break;
+                // Type AAAA
+                case "28":
+                    AAAA_info.add(nameServerInfo);
+                    break;
+                // Type OTHER
+                case "0":
+                    OTHER_info.add(nameServerInfo);
+                    break;
+            }       
+
+            System.out.println(nameServerInfo.get("qname") + " " + nameServerInfo.get("type") + " " + nameServerInfo.get("class") + " " + nameServerInfo.get("TTL") + " " + nameServerInfo.get("Rdata"));
         }
+
 
         // Iterating through additional section
         // ------------Type A IPv4----------
         // C028 0001 0001 0002A300 0004 C005061E
         // ------------Type A IPv6----------
-        // C028001C00010002A300001020010503A83E00000000000000020030
+        // C028001C0001 0002A300 0010 2001 0 503A83 E00000000000000020030
+
+        
+
         for(int aa=0; aa < additional_record_count; aa++){
-            System.out.println("?");
+            HashMap<String, String> additionalInfo = new HashMap<String, String>();
             // Common things of the two
             // Name server
             String qname = "";
-            pointerString(hexStr_bytePointer, message, qname);
-            hexStr_bytePointer+=4;
+            hexStr_bytePointer+=2;
+            String qnamepointerStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
+            int qnamepointer = Integer.parseInt(qnamepointerStr, 16)*2;
+            qname = pointerString(qnamepointer, message, qname);
+            qname = qname.substring(0, qname.length() - 1);
+            additionalInfo.put("qname", qname);
+            hexStr_bytePointer+=2;
 
             // Type
             String typeStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
             int typeInt = Integer.parseInt(typeStr, 16);
-            decodedInfo.put("type", Integer.toString(typeInt));
+            String recordType = Integer.toString(typeInt);
+            additionalInfo.put("type", recordType);
             hexStr_bytePointer += 4;
 
             // Class
             String classStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
             int classInt = Integer.parseInt(classStr, 16);
-            decodedInfo.put("class", Integer.toString(classInt));
+            additionalInfo.put("class", Integer.toString(classInt));
             hexStr_bytePointer += 4;
 
 
             // TTL
             String TTLStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+8);
             int TTLInt = Integer.parseInt(TTLStr, 16);
-            decodedInfo.put("TTL", Integer.toString(TTLInt));
+            additionalInfo.put("TTL", Integer.toString(TTLInt));
             hexStr_bytePointer += 8;
 
             // RLength
@@ -190,35 +260,86 @@ public class DNSResponse extends DNSQuery{
             int RLength = Integer.parseInt(RLengthStr, 16);
             hexStr_bytePointer += 4;
 
-            // RData
-            String Rdata = "";            
-            for(int j=0; j < RLength; j++){
-                String datatempStr =  message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
-                int datatempInt = Integer.parseInt(datatempStr, 16);
 
-                // Only one case
-                 for(int k=0; k < datatempInt; k++){
-                     hexStr_bytePointer+=2;
-                     datatempStr =  message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
-                     String letter = ByteHelper.hexToAscii(datatempStr);
-                     Rdata += letter;
+            // RData TODO 
+            // If IPv4
+            String Rdata = "";  
+            if(recordType.equals("1")){  
+                for(int j=0; j < RLength; j++){
+                    String datatempStr =  message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
+                    int number = Integer.parseInt(datatempStr, 16);
+                    // String numberStr = Integer.toString(number);
+                    Rdata += number + ".";
+                    hexStr_bytePointer+=2;
                 }
-                // Onto the next word
-                hexStr_bytePointer+=2;
+            } else if(recordType.equals("28")){
+                // If IPv6
+                // RLength is cut in half because IPv6 is read every four bits
+                for(int k=0; k < RLength/2; k++){
+                    // read every 4 index
+                    String datatempStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
+                    // remove leading zeros
+                    String number = datatempStr.replaceFirst("^0+(?!$)", "");
+                    // make sure 0 is kept 
+                    Rdata += number + ":";
+                    hexStr_bytePointer+=4;
                 }
-                
             }
+            Rdata = Rdata.substring(0, Rdata.length() - 1);
+            additionalInfo.put("Rdata", Rdata);
+
+            // Put each type in different list
+            // Type A
+            switch(additionalInfo.get("type")){
+                // Type A
+                case "1":
+                    A_info.add(additionalInfo);
+                    break;
+                // Type NS
+                case "2":
+                    NS_info.add(additionalInfo);
+                    break;
+                // Type CNAME
+                case "5":
+                    CNAME_info.add(additionalInfo);
+                    break;
+                // TYPE SOA
+                case "6":
+                    SOA_info.add(additionalInfo);
+                    break;
+                // Type MX
+                case "15":
+                    MX_info.add(additionalInfo);
+                    break;
+                // Type AAAA
+                case "28":
+                    AAAA_info.add(additionalInfo);
+                    break;
+                // Type OTHER
+                case "0":
+                    OTHER_info.add(additionalInfo);
+                    break;
+            }       
+
+            System.out.println(additionalInfo.get("qname") + " " + additionalInfo.get("type") + " " + additionalInfo.get("class") + " " + additionalInfo.get("TTL") + " " + additionalInfo.get("Rdata"));
+            
         }
+            
+    }
 
     private static String pointerString(int pointer, String message, String pointerMessage){
         // Compressed_pointer is passed into this and read as a pointer instead of the amount of letter  
-        
         String termamountStr = message.substring(pointer, pointer+2);
         int termAmount = Integer.parseInt(termamountStr, 16);
-        System.out.println(termamountStr.equals("00"));
-        System.out.println(termAmount);
         
         // Base case. When you get "00"
+        if(termamountStr.equals("C0")){
+            pointer += 2;
+            String pointStr = message.substring(pointer, pointer+2);
+            int pointTo = Integer.parseInt(pointStr, 16)*2;
+            return pointerString(pointTo, message, pointerMessage);
+        }
+
         if(termamountStr.equals("00")){           
             return pointerMessage;
         } 
@@ -234,5 +355,28 @@ public class DNSResponse extends DNSQuery{
         pointer += 2;
         return pointerString(pointer, message, pointerMessage);
     }
+
+
+
+
+
+    // [[D1],[D2],[D3], etc.]
+        // [0] to get D1
+        // then use key
+        // For loop?
+        //
+        // Cache stuff 
+        // Make it in to ResourceRecord First
+        // Then addresult (resourceRecord)
+        // ResourceRecord(String hostName, RecordType type, long ttl, String result)
+        // ResourceRecord(String hostName, RecordType type, long ttl, InetAddress result)
+        // HashMap<String, String> nameServerInfo = new HashMap<String, String>();
+        // HashMap<String, String> additionalInfo = new HashMap<String, String>();
+        // Get host name
+        // Get type
+        // get ttl
+        // if type ___ then String or InetAddress
+    
+
 
 }

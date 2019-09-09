@@ -70,7 +70,7 @@ C013 - Starts @ byte 19         <---------------BYTE 60 120
 62 - b
 C02A - Reference BYTE 42        
                                       com.b.gtld.servers.net
-
+                            Need to read C0 again 
 C013000200010002A30000 04 01 63 C02A - com.c.gtld-servers.net     <---------------BYTE 76 <---------Byte 88 at "01"
 C013000200010002A30000 04 01 64 C02A - com.d.gtld-servers.net                             <---------Byte 104 at "01"
 C013000200010002A300 00 04 01 65 C02A - com.e.gtld-servers.net                             <---------Byte 120 at "01"
@@ -81,7 +81,7 @@ C013000200010002A30000 04 01 69 C02A - com.i.gtld-servers.net                   
 C013000200010002A30000 04 01 6A C02A - com.j.gtld-servers.net                             <---------Byte 200 at "01"
 C013000200010002A30000 04 01 6B C02A - com.k.gtld-servers.net                             <---------Byte 216 at "01"
 C013000200010002A30000 04 01 6C C02A - com.l.gtld-servers.net                             <---------Byte 232 at "01"
-C013000200010002A30000 04016DC02A - com.m.gtld-servers.net                             <---------Byte 248 at "01"
+C013000200010002A30000 04 01 6D C02A - com.m.gtld-servers.net                             <---------Byte 248 at "01"
 
 -----------Type A. IPv4-----------------
 C028 - Starts @ byte 40
@@ -92,11 +92,11 @@ C028 - Starts @ byte 40
 C0 - 192
 05 - 5
 06 - 6
-1E - 30
+1E - 30 
 
                                        a.gtld.server.net - 192.5.6.30
 
-C04800010001 0002A3000 004C0210E1E - b.gtld.servers.net - 192.33.14.30
+C04800010001 0002A3000 004C0210E1E - b.gtld.servers.net - 192.33.14.30 269
 C058 00010001 0002A300 0004 C01A5C1E - c.gtld-servers.net - 192.26.92.30
 C068 00010001 0002A300 0004 C01F501E - d.gtld-servers.net - 192.31.80.30
 C078 00010001 0002A300 0004 C00C5E1E - e.gtld-servers.net - 192.12.94.30
@@ -112,8 +112,8 @@ C0F8 00010001 0002A300 0004 C037531E - m.gtld-servers.net - 192.55.83.30
 -----------Type AAAA. IPv6-----------------
 Leading zeros are suppressed
 C028 001C0001 0002A300 0010 2001 0503 A83E 0000 0000 0000 0002 0030 
-2001:0503:A83E:0000:0000:0000:0002:0030
-2001:0503:A83E::0002:0030
+                            2001:0503:A83E:0000:0000:0000:0002:0030
+                            2001:0503:A83E:0:0:0:0:0002:0030
 
 a.gtld-server.net - 32.1.5.3.168.62.0.0.0.0.0.0.2.0.48
 

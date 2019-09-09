@@ -2,6 +2,7 @@ package ca.ubc.cs.cs317.dnslookup;
 
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.net.InetAddress;
 
 /** This class handles a cache of DNS results. It is based on a map that links nodes (queries)
  * to a set of resource records (results). Cached results are only maintained for the duration
@@ -89,4 +90,56 @@ public class DNSCache {
         }
     }
 
+    public static void transferToCache(List decoded_info, DNSNode node, DNSCache cacheInstance, Set<ResourceRecord> rrSet){
+        String temp_str = "";
+        // Iterating through a set.
+        Iterator<HashMap> itr = decoded_info.iterator();
+
+        while(itr.hasNext()){
+            String hostName = node.getHostName();
+            HashMap<String, String> temp_dict = itr.next();
+            
+            // Getting type
+            String typeStr = temp_dict.get("type");
+            int typeInt = Integer.parseInt(typeStr);
+            RecordType type = RecordType.getByCode(typeInt);
+
+            // Getting time-to-live
+            String ttlStr = temp_dict.get("TTL");
+            long ttl = Long.parseLong(ttlStr);
+
+            // Getting result
+            // Need to identify the type in order to select which type to use. (String/InetAddress)
+            // If NS, String
+            // If A or AAAA, InetAdress
+            // if(typeInt)
+            if(typeInt == 1 || typeInt == 28){
+                String RdataStr = temp_dict.get("Rdata");
+                try {
+                    // (String hostName, RecordType type, long ttl, InetAddress result)
+                    InetAddress result = InetAddress.getByName(RdataStr);
+                    ResourceRecord rr = new ResourceRecord(hostName, type, ttl, result);
+
+                    // Add rr to a set
+                    rrSet.add(rr);
+
+                    // cache results 
+                    cacheInstance.addResult(rr);
+                    
+                } catch (Exception e) {
+                    System.out.println(e);
+                }
+            } else {
+                // (String hostName, RecordType type, long ttl, String result)
+                String RdataStr = temp_dict.get("Rdata");
+                ResourceRecord rr = new ResourceRecord(hostName, type, ttl, RdataStr);
+                
+                // Add rr to a set 
+                rrSet.add(rr);
+
+                // cache results 
+                cacheInstance.addResult(rr);
+            }
+        }
+    }
 }

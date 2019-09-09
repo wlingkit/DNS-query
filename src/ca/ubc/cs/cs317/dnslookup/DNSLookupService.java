@@ -20,7 +20,12 @@ public class DNSLookupService {
     private static DatagramSocket socket;
 
     private static DNSCache cache = DNSCache.getInstance();
-    private static Random random = new Random();
+
+    private static long startTime = 0;
+    private static long endTime = 0;
+    private static int numTrys = 0;
+
+    private static Set<ResourceRecord> rrSet = new HashSet<ResourceRecord>();
 
     
 
@@ -173,6 +178,7 @@ public class DNSLookupService {
      *                         returns an empty set.
      * @return A set of resource records corresponding to the specific query requested.
      */
+    private static int resend_counter = 0;
     private static Set<ResourceRecord> getResults(DNSNode node, int indirectionLevel) {
         // check if cache has it
         if (indirectionLevel > MAX_INDIRECTION_LEVEL) {
@@ -180,19 +186,32 @@ public class DNSLookupService {
             return Collections.emptySet();
         }
         retrieveResultsFromServer(node, rootServer);
-        
-        // TODO To be completed by the student
-        // Need a recursive call
-        // Send message 
-        // increment indirectionLevel by 1 for each recursion
-        // if response resloves to CNAME, get result
-        // else recurse
 
+            // if theres ipv4, grab ipv4
+            // else grab nameserver 
+        if(!DNSResponse.is_AA){
+            // Need to add a check to make sure the address hasnt been used before
+            // Check. visted 
+            if(!DNSResponse.A_info.isEmpty()){
+                // A
+                System.out.println("in here");
+                String hostName = "ns4.google.com";
+                String typeStr = DNSResponse.A_info.get(resend_counter).get("type");
+                int typeInt = Integer.parseInt(typeStr);
+                RecordType type = RecordType.getByCode(typeInt);
+                    
+                DNSNode new_node = new DNSNode(hostName, type);
+                resend_counter++;
+                getResults(new_node, indirectionLevel+1);
 
+            } else if(!DNSResponse.AAAA_info.isEmpty()){
+                // AAAA
 
-        // Caching response
-        // ResourceRecord resource_record = new ResourceRecord(hostName, type, ttl, result);
-        // cache.addResult(resource_record);
+            } else {
+                // NS
+            }
+        }
+
 
         //just make sure you return a Set of ResourceRecords
         return cache.getCachedResults(node);
@@ -213,9 +232,13 @@ public class DNSLookupService {
 
 
         byte[] encoded_message = DNSQuery.encoding(node);
+        
+        // Sending request
         send_message(encoded_message, server, DEFAULT_DNS_PORT);
-        retrieve_message();
-        //Print? Trace?
+
+        // Recieving answer 
+        retrieve_message(node);
+
     }
 
     private static void verbosePrintResourceRecord(ResourceRecord record, int rtype) {
@@ -246,12 +269,13 @@ public class DNSLookupService {
 
 
     // Send up message and obtaining the response
-    private static String send_message(byte[] message, InetAddress server, int port){
+    private static void send_message(byte[] message, InetAddress server, int port){
         DatagramPacket out = new DatagramPacket(message, message.length, server, port);
         socket.connect(server, port);
 
         try{
             socket.send(out);
+            startTime = System.currentTimeMillis();
             System.out.println("Socket sent");
         } catch (IOException e){
             e.printStackTrace();  
@@ -264,35 +288,42 @@ public class DNSLookupService {
         String questionStr = ByteHelper.bytesToHex(out.getData());
         System.out.println(questionStr);
 
-        
-
-        //TODO
-        return "Hi";
+        // TODO
     }
 
 
-    private static String retrieve_message(){
+    private static void retrieve_message(DNSNode node){
         byte[] recieve_buffer = new byte[1024];
         DatagramPacket dp = new DatagramPacket(recieve_buffer, recieve_buffer.length);
         try{
             socket.receive(dp);
-            System.out.println("Socket recieved");
+            endTime = System.currentTimeMillis();
         } catch (IOException e){
             e.printStackTrace();  
             System.out.println("IOException at socket recieving");
         }
-
-        //Helper bits to hex
-        byte received[] = dp.getData();
-        String response = new String(received);
-
-        // String[] hex = response.split("(?<=\\G..)");
+        System.out.println("Response received after " + (endTime - startTime) / 1000. + " seconds " + "(" + (numTrys - 1) + " retries)");
+        
+        
         String responseStr = ByteHelper.bytesToHex(dp.getData());
         System.out.println("responseStr");
         System.out.println(responseStr);
         DNSResponse.decoding(responseStr);
+
+        // 1. Get info from the big dict
+        // 2. Create ResourceRecord for each small dict
+        // 3. Add each ResourceRecord into a Set<ResourceRecord>
         
-        return "";
+        DNSCache cacheInstance = new DNSCache();
+        DNSCache.transferToCache(DNSResponse.A_info, node, cacheInstance, rrSet);
+        DNSCache.transferToCache(DNSResponse.AAAA_info, node, cacheInstance, rrSet);
+        DNSCache.transferToCache(DNSResponse.NS_info, node, cacheInstance, rrSet);
+        DNSCache.transferToCache(DNSResponse.CNAME_info, node, cacheInstance, rrSet);
+        DNSCache.transferToCache(DNSResponse.SOA_info, node, cacheInstance, rrSet);
+        DNSCache.transferToCache(DNSResponse.MX_info, node, cacheInstance, rrSet);
+        DNSCache.transferToCache(DNSResponse.OTHER_info, node, cacheInstance, rrSet);
+        System.out.println(cacheInstance.getCachedResults(node));
+ 
     }
 
     
