@@ -26,6 +26,7 @@ public class DNSLookupService {
     private static int numTrys = 0;
 
     private static Set<ResourceRecord> rrSet = new HashSet<ResourceRecord>();
+    public static DNSCache cacheInstance = new DNSCache();
 
     
 
@@ -179,40 +180,61 @@ public class DNSLookupService {
      * @return A set of resource records corresponding to the specific query requested.
      */
     private static int resend_counter = 0;
-    private static Set<ResourceRecord> getResults(DNSNode node, int indirectionLevel) {
+    private static Set<ResourceRecord> getResults(DNSNode node, int indirectionLevel){
+        // Check Cache?
+        // TODO If its AA, then return the address
+        
+        System.out.println("Indirection level: " + indirectionLevel);
         // check if cache has it
         if (indirectionLevel > MAX_INDIRECTION_LEVEL) {
             System.err.println("Maximum number of indirection levels reached.");
             return Collections.emptySet();
         }
-        retrieveResultsFromServer(node, rootServer);
-
-            // if theres ipv4, grab ipv4
-            // else grab nameserver 
-        if(!DNSResponse.is_AA){
-            // Need to add a check to make sure the address hasnt been used before
-            // Check. visted 
-            if(!DNSResponse.A_info.isEmpty()){
-                // A
-                System.out.println("in here");
-                String hostName = "ns4.google.com";
-                String typeStr = DNSResponse.A_info.get(resend_counter).get("type");
-                int typeInt = Integer.parseInt(typeStr);
-                RecordType type = RecordType.getByCode(typeInt);
-                    
-                DNSNode new_node = new DNSNode(hostName, type);
-                resend_counter++;
-                getResults(new_node, indirectionLevel+1);
-
-            } else if(!DNSResponse.AAAA_info.isEmpty()){
-                // AAAA
-
-            } else {
-                // NS
-            }
+        
+    
+        int A_info_count = DNSResponse.A_info.size();
+        // Temp check
+        if(resend_counter > A_info_count){
+            System.out.println("Resend_counter > A_info_count");
         }
+        
+        // TODO 
+        // Make it loop on the NEW A_info
+        // Try setting hostname as qname
+        if(indirectionLevel == 0){
+            retrieveResultsFromServer(node, rootServer);
+            if(!DNSResponse.is_AA){
+                getResults(node, indirectionLevel+1);
+            }
+        } else if(!DNSResponse.A_info.isEmpty()){
+            System.out.println("DNSResponse.A_info.isEmpty() is " + DNSResponse.A_info.isEmpty());
+            System.out.println("Resend counter: " + resend_counter);
+            // TODO change IP to newly aquired servers
+            String serverStr = DNSResponse.A_info.get(resend_counter).get("Rdata");
+            System.out.println("Rdata: " + serverStr);
+            try{   
+                InetAddress server = InetAddress.getByName(serverStr);
+                resend_counter++;
+                DNSResponse.A_info.clear();
+                retrieveResultsFromServer(node, server);
+                System.out.println("DNSResponse.A_info.isEmpty() is " + DNSResponse.A_info.isEmpty());
+                // System.out.println("Is this a authoritative answer? " + DNSResponse.is_AA);
+                if(!DNSResponse.is_AA){
+                        getResults(node, indirectionLevel+1);
+                } else {
+                    // If it is an quthoritative answer
+                    System.out.println("IP address is: " + DNSResponse.A_info.get(0).get("Rdata"));
+                }
+            } catch(Exception e) {
+                 System.out.println(e);
+            }
+        } else if(DNSResponse.A_info.isEmpty() && !DNSResponse.is_AA){
+            // TODO IF DEADEND
+            // GO TO TYPE NS
+            // Make new node with rootServer
 
-
+        }
+        
         //just make sure you return a Set of ResourceRecords
         return cache.getCachedResults(node);
     }
@@ -232,14 +254,35 @@ public class DNSLookupService {
 
 
         byte[] encoded_message = DNSQuery.encoding(node);
-        
+        FormatQueryTrace(node, server);
         // Sending request
         send_message(encoded_message, server, DEFAULT_DNS_PORT);
 
         // Recieving answer 
         retrieve_message(node);
 
+        // If not blah getResults again
+
     }
+
+    private static void FormatQueryTrace(DNSNode node, InetAddress server) {
+        System.out.print("\n\n"); // begin with two blank lines
+        RecordType qType = node.getType(); // convert type code to corresponding letter code (E.g 1 == A)
+        String queryFormat = String.format("Query ID     %s %s  %s --> %s", DNSQuery.rand_id, DNSQuery.qnameStr, qType, server);
+        System.out.println(queryFormat);
+       }
+
+    private static void FormatResponseTrace() {
+        // System.out.println("Query Id     " + qs.transID + " " + qs.lookupName + "  " + convertQType + " --> " + qs.DNSIA.getHostAddress()); // TODO???
+        String responseFormat = String.format("Response ID: %s Authoritative = %s", DNSQuery.rand_id, DNSResponse.is_AA);
+        System.out.println(responseFormat);
+        // System.out.println("Response ID: " + qr.responseID + " " + "Authoritative " + "= " + qr.authFlag);
+        
+        // resourceRecordFormat("Answers", qr);
+        // resourceRecordFormat("Nameservers", qr);
+        // resourceRecordFormat("Additional Information", qr);
+    }
+    
 
     private static void verbosePrintResourceRecord(ResourceRecord record, int rtype) {
         if (verboseTracing)
@@ -276,22 +319,16 @@ public class DNSLookupService {
         try{
             socket.send(out);
             startTime = System.currentTimeMillis();
-            System.out.println("Socket sent");
         } catch (IOException e){
-            e.printStackTrace();  
-            System.out.println("IOException at socket sending");
+            e.printStackTrace(); 
         }
 
-
-        
-        System.out.println("DatagramPacket data string");
         String questionStr = ByteHelper.bytesToHex(out.getData());
-        System.out.println(questionStr);
 
         // TODO
     }
 
-
+    
     private static void retrieve_message(DNSNode node){
         byte[] recieve_buffer = new byte[1024];
         DatagramPacket dp = new DatagramPacket(recieve_buffer, recieve_buffer.length);
@@ -302,19 +339,21 @@ public class DNSLookupService {
             e.printStackTrace();  
             System.out.println("IOException at socket recieving");
         }
-        System.out.println("Response received after " + (endTime - startTime) / 1000. + " seconds " + "(" + (numTrys - 1) + " retries)");
+        System.out.println("Response received after " + (endTime - startTime) / 1000. + " seconds " + "(" + (numTrys) + " retries)");
+        System.out.println("Response ID: " + DNSQuery.rand_id + String.format("Authoritative = %b", DNSResponse.is_AA));
         
         
         String responseStr = ByteHelper.bytesToHex(dp.getData());
-        System.out.println("responseStr");
-        System.out.println(responseStr);
+        // System.out.println("Response String:");
+        // System.out.println(responseStr);
         DNSResponse.decoding(responseStr);
-
+        
+        FormatResponseTrace();
         // 1. Get info from the big dict
         // 2. Create ResourceRecord for each small dict
         // 3. Add each ResourceRecord into a Set<ResourceRecord>
         
-        DNSCache cacheInstance = new DNSCache();
+        
         DNSCache.transferToCache(DNSResponse.A_info, node, cacheInstance, rrSet);
         DNSCache.transferToCache(DNSResponse.AAAA_info, node, cacheInstance, rrSet);
         DNSCache.transferToCache(DNSResponse.NS_info, node, cacheInstance, rrSet);
@@ -322,12 +361,7 @@ public class DNSLookupService {
         DNSCache.transferToCache(DNSResponse.SOA_info, node, cacheInstance, rrSet);
         DNSCache.transferToCache(DNSResponse.MX_info, node, cacheInstance, rrSet);
         DNSCache.transferToCache(DNSResponse.OTHER_info, node, cacheInstance, rrSet);
-        System.out.println(cacheInstance.getCachedResults(node));
  
     }
-
-    
- 
-
  
 }

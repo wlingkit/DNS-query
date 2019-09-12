@@ -7,6 +7,15 @@ import java.util.*;
 public class DNSQuery{
     
     private static Random random = new Random();
+    public static String rand_id = "";
+    public static String query_parameters = "";
+    public static String num_of_questions = "0001";
+    public static String num_of_answers = "0000";
+    public static String authority_records = "0000";
+    public static String additional_records = "0000";
+    public static String qnameStr = "";
+    public static String message = "";
+    public static String qtype = "";
 
        // Encoding message for send up
     // Message structure: message = "AA AA |01 00           |  00 01  | 00 00 |00 00            |00 00              |07 65 78 61 6d 70 6c 65 03 63 6f 6d 00| 00 01| 00 01"
@@ -25,26 +34,26 @@ public class DNSQuery{
         // Randomly generate two bytes for the unique id
         byte[] rand_byte = new byte[2];
         random.nextBytes(rand_byte);
-        String rand_id = ByteHelper.bytesToHex(rand_byte);
+        rand_id = ByteHelper.bytesToHex(rand_byte);
         
         // Query parameters - two bytes [QR, Opcode, AA, TC, RD][RA, Z, RCODE]
         // Every four binary into one hexadecimal. 8 binaries into one byte 
-        String query_parameters = "0000";
+        query_parameters = "0000";
 
         // Number of questions - two bytes [00][01]
-        String num_of_questions = "0001";
+        // num_of_questions = "0001";
 
         // Number of answers - two bytes [00][00]
-        String num_of_answers = "0000";
+        // num_of_answers = "0000";
 
         // Authority records - two bytes [00][00]
-        String authority_records = "0000";
+        // authority_records = "0000";
 
         // Additional records - two bytes [00][00]
-        String additional_records = "0000";
+        // additional_records = "0000";
 
         // Qname - Enough for name. Convert each letter to hex by itself
-        String qnameStr = node.getHostName();
+        qnameStr = node.getHostName();
         // Split qname by "."
         String[] qnameArray = qnameStr.split("\\.");
 
@@ -79,7 +88,7 @@ public class DNSQuery{
 
         // Qtype - two bytes [00][.getType]
         String qtype_hexStr = qtype_encode(node);
-        String qtype = "";
+        
         if(qtype_hexStr.length() == 1){
             qtype += "000" + qtype_hexStr;
         } else if(qtype_hexStr.length() == 2){
@@ -90,7 +99,7 @@ public class DNSQuery{
         String qclass = "0001";
 
         // Figure out now many bytes you need 16 + qname every letter is a byte
-        String message = rand_id + query_parameters + num_of_questions + num_of_answers + authority_records + additional_records + qname + qtype + qclass;
+        message = rand_id + query_parameters + num_of_questions + num_of_answers + authority_records + additional_records + qname + qtype + qclass;
         byte[] message_byteArray = ByteHelper.hexStringToByteArray(message);
 
         // String message = id_str + query_parameters + num_question + num_answer + authority_record + additional_record + qname + qtype + qclass;
