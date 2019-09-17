@@ -16,35 +16,11 @@ public class DNSResponse extends DNSQuery{
 
     // Keep track if server is authoritative
     public static boolean is_AA = false; 
+    private static int hexStr_bytePointer = 0;
 
-    //Decoding message 
-    //Have a global variable to indicate where you are
-    // -------------Question------------
-        // 3322800000010000000D000E06676F6F676C6503636F6D0000010001 <- BYTE 28
-
-        // -------------Type NS-------------
-        // C013 00020001 0002A300 0014 01610C67746C642D73657276657273036E657400
-        // C013 000200010002A30000040162C02A C013000200010002A30000040163C02A C013000200010002A30000040164C02A C013000200010002A30000040165C02A
-        // C013000200010002A30000040166C02A C013000200010002A30000040167C02A C013000200010002A30000040168C02A C013000200010002A30000040169C02A 
-        // C013000200010002A3000004016AC02A C013000200010002A3000004016BC02A C013000200010002A3000004016CC02A C013000200010002A3000004016DC02A
-
-
-        // ------------Type A IPv4----------
-        // C028000100010002A3000004C005061E C048000100010002A3000004C0210E1E C058000100010002A3000004C01A5C1E C068000100010002A3000004C01F501E
-        // C078000100010002A3000004C00C5E1E C088000100010002A3000004C023331E C098000100010002A3000004C02A5D1E C0A8000100010002A3000004C036701E
-        // C0B8000100010002A3000004C02BAC1E C0C8000100010002A3000004C0304F1E C0D8000100010002A3000004C034B21E C0E8000100010002A3000004C029A21E
-        // C0F8000100010002A3000004C037531E 
-        // ------------Type A IPv6----------
-        // C028001C00010002A300001020010503A83E00000000000000020030
-        
-        // Get type, class, TTL
-        // Depending on the type for next step:
-        // if 01, C0 is not a points and is a number 
-        // if 02, C0 is a pointer and end with 00 
     public static void decoding(String message){
-        // TODO cant skip. Need to find Number of server name and number of additional info
-        int hexStr_bytePointer = 0;
-
+        hexStr_bytePointer = 0;
+        
         int ID_OFFSET = 0;
         hexStr_bytePointer+=4;
 
@@ -92,11 +68,6 @@ public class DNSResponse extends DNSQuery{
         hexStr_bytePointer+=4;
 
 
-        
-        // Iterating through name servers 
-        // The two cases
-        // C013 0002 0001 0002A300 0014 0161 0C 67746C642D73657276657273036E657400
-        // C013 0002 0001 0002A300 0004 0163 C0 2A
         System.out.println(String.format("Nameservers (%o)", name_server_count));
         for(int ns=0; ns < name_server_count; ns++){
             HashMap<String, String> nameServerInfo = new HashMap<String, String>();
@@ -154,7 +125,6 @@ public class DNSResponse extends DNSQuery{
                         hexStr_bytePointer+=2;
                         j+=4;
                     } else {
-    
                     // CASE TWO where theres no pointer 
                         for(int k=0; k < datatempInt; k++){
                             hexStr_bytePointer+=2;
@@ -219,14 +189,6 @@ public class DNSResponse extends DNSQuery{
             
         }
 
-
-        // Iterating through additional section 31339
-        // ------------Type A IPv4----------
-        // C028 0001 0001 0002A300 0004 C005061E
-        // ------------Type A IPv6----------
-        // C028001C0001 0002A300 0010 2001 0 503A83 E00000000000000020030
-
-        
         System.out.println(String.format("Additional Information (%o)", additional_record_count));
         for(int aa=0; aa < additional_record_count; aa++){
             HashMap<String, String> additionalInfo = new HashMap<String, String>();
@@ -313,14 +275,12 @@ public class DNSResponse extends DNSQuery{
                 }
             } else if(recordType.equals("2") || recordType.equals("5")){
                 // If CNAME
-                // SPOMETHING HEREE IS MAKING 4 BITS EXTRA !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 for(int j=0; j < RLength; j++){
                     String datatempStr =  message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
                     int datatempInt = Integer.parseInt(datatempStr, 16);
     
                     // CASE ONE where theres a pointer(compressed message)
                     if(datatempStr.equals("C0")){
-                        // 179 OFFSET
                         hexStr_bytePointer+=2;
                         String RdatapointerStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
                         int Rdatapointer = Integer.parseInt(RdatapointerStr, 16)*2;  
@@ -338,11 +298,12 @@ public class DNSResponse extends DNSQuery{
                             String letter = ByteHelper.hexToAscii(datatempStr);
                             Rdata += letter;
                         }
+                        
                         // Onto the next word
                         hexStr_bytePointer+=2;
                     }
                     Rdata += ".";
-                }
+                }             
                 Rdata = Rdata.substring(0, Rdata.length() - 1);
             }
 
@@ -416,6 +377,40 @@ public class DNSResponse extends DNSQuery{
         pointerMessage+=".";
         pointer += 2;
         return pointerString(pointer, message, pointerMessage);
+    }
+
+    private static void get_NS_CNAME(int RLength, int pointer, String Rdata){
+        for(int j=0; j < RLength; j++){
+            String datatempStr =  message.substring(pointer, pointer+2);
+            int datatempInt = Integer.parseInt(datatempStr, 16);
+
+            // CASE ONE where theres a pointer(compressed message)
+            if(datatempStr.equals("C0")){
+                pointer+=2;
+                String RdatapointerStr = message.substring(pointer, pointer+2);
+                int Rdatapointer = Integer.parseInt(RdatapointerStr, 16)*2;  
+
+                Rdata = pointerString(Rdatapointer, message, Rdata);
+                pointer+=2;
+                j+=4;
+            } else {
+
+            // CASE TWO where theres no pointer 
+                for(int k=0; k < datatempInt; k++){
+                    pointer+=2;
+                    j++;
+                    datatempStr = message.substring(pointer, pointer+2);
+                    String letter = ByteHelper.hexToAscii(datatempStr);
+                    Rdata += letter;
+                }
+                
+                // Onto the next word
+                pointer+=2;
+            }
+            Rdata += ".";
+            
+        }
+        hexStr_bytePointer = pointer;
     }
 
 }

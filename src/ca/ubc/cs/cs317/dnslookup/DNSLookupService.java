@@ -198,12 +198,22 @@ public class DNSLookupService {
             System.out.println("Resend_counter > A_info_count");
         }
         
-        // TODO 
-        // Make it loop on the NEW A_info
-        // Try setting hostname as qname
+    
+        // 1. Call domain server with RootServer (node, rootServer)
+        // 1a. Send message
+        // 1b. Retrieve message
+        // 2. Cache info
+        // 3. Check if response from an AA server
+        // 4a. If so, return the IP address
+        // 4b. If not, check if there are IPv4 addresses. Grab one and resend message down the path.
+        // 5. If deadend, resolve using by changing hostname and use rootserver
+
         if(indirectionLevel == 0){
             retrieveResultsFromServer(node, rootServer);
+
+            //TODO What is this?
             if(!DNSResponse.is_AA){
+                System.out.println("ASdDDdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
                 getResults(node, indirectionLevel+1);
             }
         } else if(!DNSResponse.A_info.isEmpty()){
@@ -274,6 +284,7 @@ public class DNSLookupService {
 
     private static void FormatResponseTrace() {
         // System.out.println("Query Id     " + qs.transID + " " + qs.lookupName + "  " + convertQType + " --> " + qs.DNSIA.getHostAddress()); // TODO???
+        System.out.println("Response received after " + (endTime - startTime) / 1000. + " seconds " + "(" + (numTrys) + " retries)");
         String responseFormat = String.format("Response ID: %s Authoritative = %s", DNSQuery.rand_id, DNSResponse.is_AA);
         System.out.println(responseFormat);
         // System.out.println("Response ID: " + qr.responseID + " " + "Authoritative " + "= " + qr.authFlag);
@@ -339,21 +350,17 @@ public class DNSLookupService {
             e.printStackTrace();  
             System.out.println("IOException at socket recieving");
         }
-        System.out.println("Response received after " + (endTime - startTime) / 1000. + " seconds " + "(" + (numTrys) + " retries)");
-        System.out.println("Response ID: " + DNSQuery.rand_id + String.format("Authoritative = %b", DNSResponse.is_AA));
-        
-        
+
         String responseStr = ByteHelper.bytesToHex(dp.getData());
+        
         // System.out.println("Response String:");
         // System.out.println(responseStr);
         DNSResponse.decoding(responseStr);
-        
         FormatResponseTrace();
+
         // 1. Get info from the big dict
         // 2. Create ResourceRecord for each small dict
         // 3. Add each ResourceRecord into a Set<ResourceRecord>
-        
-        
         DNSCache.transferToCache(DNSResponse.A_info, node, cacheInstance, rrSet);
         DNSCache.transferToCache(DNSResponse.AAAA_info, node, cacheInstance, rrSet);
         DNSCache.transferToCache(DNSResponse.NS_info, node, cacheInstance, rrSet);
