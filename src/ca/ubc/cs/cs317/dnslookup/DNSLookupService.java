@@ -25,8 +25,7 @@ public class DNSLookupService {
     private static long endTime = 0;
     private static int numTrys = 0;
 
-    private static Set<ResourceRecord> rrSet = new HashSet<ResourceRecord>();
-    public static DNSCache cacheInstance = new DNSCache();
+    public static DNSCache cacheInstance = DNSCache.getInstance();
 
     
 
@@ -179,74 +178,45 @@ public class DNSLookupService {
      *                         returns an empty set.
      * @return A set of resource records corresponding to the specific query requested.
      */
-    private static int resend_counter = 0;
-    private static Set<ResourceRecord> getResults(DNSNode node, int indirectionLevel){
-        // Check Cache?
-        // TODO If its AA, then return the address
-        
+    private static int resendCounter = 1;
+    private static Set<ResourceRecord> getResults(DNSNode node, int indirectionLevel){       
         System.out.println("Indirection level: " + indirectionLevel);
-        // check if cache has it
+        
+        // Base case
         if (indirectionLevel > MAX_INDIRECTION_LEVEL) {
             System.err.println("Maximum number of indirection levels reached.");
             return Collections.emptySet();
         }
+
+        // 1. Call domain server with RootServer (node, rootServer)
+        retrieveResultsFromServer(node, rootServer);
+
+         // 3. Check if response from an AA server
+
         
-    
-        int A_info_count = DNSResponse.A_info.size();
-        // Temp check
-        if(resend_counter > A_info_count){
-            System.out.println("Resend_counter > A_info_count");
+
+        // If a dead-end is found. This is when there is not A type info and server is not authoritative
+        // if(DNSResponse.answerRecord.isEmpty() && DNSResponse.nameServerRecord.isEmpty() && DNSResponse.additionalRecord.isEmpty() ){
+
+        // }
+        if(DNSResponse.A_info.isEmpty() && !DNSResponse.is_AA){
+            String nsStr = DNSResponse.NS_info.get(resendCounter).get("Rdata");
+            // DNSResponse.clearList();
+            // Make new node and resend message with it. With rootServer
+            DNSNode new_node = new DNSNode(nsStr, node.getType());
+            resendCounter = 1;
+            getResults(new_node, indirectionLevel+1);
         }
         
-    
-        // 1. Call domain server with RootServer (node, rootServer)
-        // 1a. Send message
-        // 1b. Retrieve message
-        // 2. Cache info
-        // 3. Check if response from an AA server
-        // 4a. If so, return the IP address
-        // 4b. If not, check if there are IPv4 addresses. Grab one and resend message down the path.
-        // 5. If deadend, resolve using by changing hostname and use rootserver
-
-        if(indirectionLevel == 0){
-            retrieveResultsFromServer(node, rootServer);
-
-            //TODO What is this?
-            if(!DNSResponse.is_AA){
-                System.out.println("ASdDDdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
-                getResults(node, indirectionLevel+1);
-            }
-        } else if(!DNSResponse.A_info.isEmpty()){
-            System.out.println("DNSResponse.A_info.isEmpty() is " + DNSResponse.A_info.isEmpty());
-            System.out.println("Resend counter: " + resend_counter);
-            // TODO change IP to newly aquired servers
-            String serverStr = DNSResponse.A_info.get(resend_counter).get("Rdata");
-            System.out.println("Rdata: " + serverStr);
-            try{   
-                InetAddress server = InetAddress.getByName(serverStr);
-                resend_counter++;
-                DNSResponse.A_info.clear();
-                retrieveResultsFromServer(node, server);
-                System.out.println("DNSResponse.A_info.isEmpty() is " + DNSResponse.A_info.isEmpty());
-                // System.out.println("Is this a authoritative answer? " + DNSResponse.is_AA);
-                if(!DNSResponse.is_AA){
-                        getResults(node, indirectionLevel+1);
-                } else {
-                    // If it is an quthoritative answer
-                    System.out.println("IP address is: " + DNSResponse.A_info.get(0).get("Rdata"));
-                }
-            } catch(Exception e) {
-                 System.out.println(e);
-            }
-        } else if(DNSResponse.A_info.isEmpty() && !DNSResponse.is_AA){
-            // TODO IF DEADEND
-            // GO TO TYPE NS
-            // Make new node with rootServer
-
+        Set<ResourceRecord> ans = new HashSet<ResourceRecord>();
+        for(int i=0; i < DNSResponse.authoritativeAnswers.size(); i++){
+            ResourceRecord rr_temp = toResoureRecord(node, DNSResponse.authoritativeAnswers.get(i));
+            ans.add(rr_temp);
         }
         
         //just make sure you return a Set of ResourceRecords
-        return cache.getCachedResults(node);
+        // cache.getCachedResults(node);
+        return ans;
     }
 
     /**
@@ -258,21 +228,42 @@ public class DNSLookupService {
      * @param server Address of the server to be used for the query.
      */
     private static void retrieveResultsFromServer(DNSNode node, InetAddress server){
-
-        // TODO To be completed by the student
-        // repeated with a new server if the provided one is non-authoritative. That means AA=0
-
-
         byte[] encoded_message = DNSQuery.encoding(node);
-        FormatQueryTrace(node, server);
+        if(verboseTracing){
+            FormatQueryTrace(node, server);
+        }
+        System.out.println("-------------------Check point 1------------------------");
+
         // Sending request
         send_message(encoded_message, server, DEFAULT_DNS_PORT);
 
+        System.out.println("-------------------Check point 2------------------------");
         // Recieving answer 
+        DNSResponse.clearList();
         retrieve_message(node);
+        if(verboseTracing){
+            System.out.println("-------------------Check point 6------------------------");
+            FormatResponseTrace(node);
+        }
+        System.out.println("-------------------Check point 7------------------------");
+        // 4b. If not, check if there are IPv4 addresses. Grab one and resend message down the path.
+        // DOESNT HAVE NS OR DOESNT HAVE AA
+        if(!DNSResponse.is_AA && !DNSResponse.A_info.isEmpty()){
+            System.out.println("-------------------Check point 8------------------------");
+            String serverStr = DNSResponse.A_info.get(resendCounter).get("Rdata"); 
+            System.out.println("-------------------Check point 9------------------------");
+            // resend_counter++;      google.ca                      172800     A    185.159.196.2
+            try{
+                // Clear hash after the data has already been cached for new data
+                InetAddress new_server = InetAddress.getByName(serverStr);
 
-        // If not blah getResults again
+                retrieveResultsFromServer(node, new_server);
 
+            } catch(Exception e){
+                System.out.println(e);
+            }
+        }
+        
     }
 
     private static void FormatQueryTrace(DNSNode node, InetAddress server) {
@@ -282,13 +273,37 @@ public class DNSLookupService {
         System.out.println(queryFormat);
        }
 
-    private static void FormatResponseTrace() {
+    private static void FormatResponseTrace(DNSNode node) {
         // System.out.println("Query Id     " + qs.transID + " " + qs.lookupName + "  " + convertQType + " --> " + qs.DNSIA.getHostAddress()); // TODO???
         System.out.println("Response received after " + (endTime - startTime) / 1000. + " seconds " + "(" + (numTrys) + " retries)");
         String responseFormat = String.format("Response ID: %s Authoritative = %s", DNSQuery.rand_id, DNSResponse.is_AA);
         System.out.println(responseFormat);
-        // System.out.println("Response ID: " + qr.responseID + " " + "Authoritative " + "= " + qr.authFlag);
-        
+
+
+        // TODO 
+        System.out.printf("Answers [%s]\n", DNSResponse.numAnswer);
+        for(int i=0; i < DNSResponse.answerRecord.size(); i++){
+            ResourceRecord rrTemp = toResoureRecord(node, DNSResponse.answerRecord.get(i));
+            String typeStr = DNSResponse.answerRecord.get(i).get("type");
+            int typeInt = Integer.parseInt(typeStr);
+            verbosePrintResourceRecord(rrTemp, typeInt);
+        }
+
+        System.out.printf("Name Servers [%s]\n", DNSResponse.numNameServer);
+        for(int i=0; i < DNSResponse.nameServerRecord.size(); i++){
+            ResourceRecord rrTemp = toResoureRecord(node, DNSResponse.nameServerRecord.get(i));
+            String typeStr = DNSResponse.nameServerRecord.get(i).get("type");
+            int typeInt = Integer.parseInt(typeStr);
+            verbosePrintResourceRecord(rrTemp, typeInt);
+        }
+
+        System.out.printf("Additional Records [%s]\n", DNSResponse.numAdditionalRecord);
+        for(int i=0; i < DNSResponse.additionalRecord.size(); i++){
+            ResourceRecord rrTemp = toResoureRecord(node, DNSResponse.additionalRecord.get(i));
+            String typeStr = DNSResponse.additionalRecord.get(i).get("type");
+            int typeInt = Integer.parseInt(typeStr);
+            verbosePrintResourceRecord(rrTemp, typeInt);
+        }
         // resourceRecordFormat("Answers", qr);
         // resourceRecordFormat("Nameservers", qr);
         // resourceRecordFormat("Additional Information", qr);
@@ -309,11 +324,11 @@ public class DNSLookupService {
      * @param node    Host name and record type used for the query.
      * @param results Set of results to be printed for the node.
      */
-    private static void printResults(DNSNode node, Set<ResourceRecord> results) {
+    private static void printResults(DNSNode node, Set<ResourceRecord> results){
         if (results.isEmpty())
             System.out.printf("%-30s %-5s %-8d %s\n", node.getHostName(),
                     node.getType(), -1, "0.0.0.0");
-        for (ResourceRecord record : results) {
+        for (ResourceRecord record : results){
             System.out.printf("%-30s %-5s %-8d %s\n", node.getHostName(),
                     node.getType(), record.getTTL(), record.getTextResult());
         }
@@ -333,10 +348,6 @@ public class DNSLookupService {
         } catch (IOException e){
             e.printStackTrace(); 
         }
-
-        String questionStr = ByteHelper.bytesToHex(out.getData());
-
-        // TODO
     }
 
     
@@ -350,25 +361,48 @@ public class DNSLookupService {
             e.printStackTrace();  
             System.out.println("IOException at socket recieving");
         }
-
+        System.out.println("-------------------Check point 3------------------------");
         String responseStr = ByteHelper.bytesToHex(dp.getData());
-        
-        // System.out.println("Response String:");
-        // System.out.println(responseStr);
+
+        System.out.println("-------------------Check point 4------------------------");
+        System.out.println("Response String:");
+        System.out.println(responseStr);
         DNSResponse.decoding(responseStr);
-        FormatResponseTrace();
+        System.out.println("-------------------Check point 5------------------------");
+        
 
         // 1. Get info from the big dict
         // 2. Create ResourceRecord for each small dict
         // 3. Add each ResourceRecord into a Set<ResourceRecord>
-        DNSCache.transferToCache(DNSResponse.A_info, node, cacheInstance, rrSet);
-        DNSCache.transferToCache(DNSResponse.AAAA_info, node, cacheInstance, rrSet);
-        DNSCache.transferToCache(DNSResponse.NS_info, node, cacheInstance, rrSet);
-        DNSCache.transferToCache(DNSResponse.CNAME_info, node, cacheInstance, rrSet);
-        DNSCache.transferToCache(DNSResponse.SOA_info, node, cacheInstance, rrSet);
-        DNSCache.transferToCache(DNSResponse.MX_info, node, cacheInstance, rrSet);
-        DNSCache.transferToCache(DNSResponse.OTHER_info, node, cacheInstance, rrSet);
- 
+        // Need to CACHE the results to CAHCERESULTS in DNSCACHE CLass USING ADD RESULT
+        DNSCache.transferToCache(DNSResponse.A_info, node, cacheInstance);
+        DNSCache.transferToCache(DNSResponse.AAAA_info, node, cacheInstance);
+        DNSCache.transferToCache(DNSResponse.NS_info, node, cacheInstance);
+        DNSCache.transferToCache(DNSResponse.CNAME_info, node, cacheInstance);
+        DNSCache.transferToCache(DNSResponse.SOA_info, node, cacheInstance);
+        DNSCache.transferToCache(DNSResponse.MX_info, node, cacheInstance);
+        DNSCache.transferToCache(DNSResponse.OTHER_info, node, cacheInstance);
     }
- 
+    
+
+    private static ResourceRecord toResoureRecord(DNSNode node, HashMap<String, String> record){
+        cache = DNSCache.getInstance();
+
+        // Getting hostName
+        String hostName = node.getHostName();
+            
+        // Getting type
+        String typeStr = record.get("type");
+        int typeInt = Integer.parseInt(typeStr);
+        RecordType type = RecordType.getByCode(typeInt);
+
+        // Getting time-to-live
+        String ttlStr = record.get("TTL");
+        long ttl = Long.parseLong(ttlStr);
+
+        // (String hostName, RecordType type, long ttl, String result)
+        String RdataStr = record.get("Rdata");
+        ResourceRecord rr = new ResourceRecord(hostName, type, ttl, RdataStr);
+        return rr;
+    }
 }

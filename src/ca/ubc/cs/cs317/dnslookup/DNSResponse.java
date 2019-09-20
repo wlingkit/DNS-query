@@ -13,63 +13,233 @@ public class DNSResponse extends DNSQuery{
     public static List<HashMap<String, String>> MX_info = new ArrayList<HashMap<String, String>>();
     public static List<HashMap<String, String>> SOA_info = new ArrayList<HashMap<String, String>>();
     public static List<HashMap<String, String>> OTHER_info = new ArrayList<HashMap<String, String>>();
+    
+
+    public static List<HashMap<String, String>> answerRecord = new ArrayList<HashMap<String, String>>();
+    public static List<HashMap<String, String>> nameServerRecord = new ArrayList<HashMap<String, String>>();
+    public static List<HashMap<String, String>> additionalRecord = new ArrayList<HashMap<String, String>>();
+    public static List<HashMap<String, String>> authoritativeAnswers = new ArrayList<HashMap<String, String>>();
 
     // Keep track if server is authoritative
     public static boolean is_AA = false; 
     private static int hexStr_bytePointer = 0;
+    public static int numAnswer;
+    public static int numNameServer;
+    public static int numAdditionalRecord;
+
+    // OFFSETS
+    private static int READING_OFFSET = 2;
+    private static int ID_OFFSET = 4;
+    private static int QR_OFFSET = 4;
+    private static int QDCOUNT_OFFSET = 4;
+    private static int ANCOUNT_OFFSET = 4;
+    private static int NSCOUNT_OFFSET = 4;
+    private static int ARCOUNT_OFFSET = 4;
+    private static int QTYPE_OFFSET = 4;
+    private static int QCLASS_OFFSET = 4;
+    private static int TYPE_OFFSET = 4;
+    private static int CLASS_OFFSET = 4;
+    private static int TTL_OFFSET = 8;
+    private static int RLENGTH_OFFSET = 4;
 
     public static void decoding(String message){
+        System.out.println("-------------------Check point 5------------------------");
         hexStr_bytePointer = 0;
         
-        int ID_OFFSET = 0;
-        hexStr_bytePointer+=4;
+        hexStr_bytePointer+=ID_OFFSET;
 
-        int QR_OFFSET = 4;
         // aa is at index 5 in the 16 bits
-        // TODO figure out if server is authoritative 
-        String QRStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
-        int QRInt = Integer.parseInt(QRStr, 16);
-        String QRBinary = Integer.toBinaryString(QRInt); 
-        char is_authoritative = QRBinary.charAt(5);
-        if(is_authoritative == '1'){
-            is_AA = true;
-        }        
-        hexStr_bytePointer+=4;
+        is_AA = is_authoritative(hexStr_bytePointer, message);
+        hexStr_bytePointer+=QR_OFFSET;
 
-        int QDCOUNT_OFFSET = 8;
-        hexStr_bytePointer+=4;
+        System.out.println("-------------------Check point 6------------------------");
+        // Number of questions
+        hexStr_bytePointer+=QDCOUNT_OFFSET;
 
-        int ANCOUNT_OFFSET = 12;
-        hexStr_bytePointer+=4;
+        // Number of answers
+        
+        String numAnswerStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
+        numAnswer = Integer.parseInt(numAnswerStr, 16);
+        System.out.println("numAnswer: "+ numAnswer);
+        hexStr_bytePointer+=ANCOUNT_OFFSET;
+        System.out.println("-------------------Check point 7------------------------");
 
-        int NSCOUNT_OFFSET = 16;
-        String name_server_countStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
-        int name_server_count = Integer.parseInt(name_server_countStr, 16);
-        hexStr_bytePointer+=4;
+        // Number of name servers
+        
+        String numNameServerStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
+        numNameServer = Integer.parseInt(numNameServerStr, 16);
+        hexStr_bytePointer+=NSCOUNT_OFFSET;
+        System.out.println("numNameServer: "+ numNameServer);
+        System.out.println("-------------------Check point 8------------------------");
 
-        int ARCOUNT_OFFSET = 20;
-        String additional_record_countStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
-        int additional_record_count = Integer.parseInt(additional_record_countStr, 16);
-        hexStr_bytePointer+=4;
+        // Number of additional records
+        
+        String numAdditionalRecordStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
+        numAdditionalRecord = Integer.parseInt(numAdditionalRecordStr, 16);
+        System.out.println("numAdditionalRecord: "+ numAdditionalRecord);
+        hexStr_bytePointer+=ARCOUNT_OFFSET;
+        System.out.println("-------------------Check point 9------------------------");
 
-        int QNAME_OFFSET = 24;
         String pointerStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
         while(!pointerStr.equals("00")){
-            hexStr_bytePointer+=2;
+            hexStr_bytePointer+=READING_OFFSET;
             pointerStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
         }
         // Shifting byte after getting "00"
-        hexStr_bytePointer+=2;
+        hexStr_bytePointer+=READING_OFFSET;
+        System.out.println("-------------------Check point 10------------------------");
 
-        int QTYPE_OFFSET;
-        hexStr_bytePointer+=4;
+        hexStr_bytePointer+=QTYPE_OFFSET;
 
-        int QCLASS_OFFSET;
-        hexStr_bytePointer+=4;
+        hexStr_bytePointer+=QCLASS_OFFSET;
 
+        for(int a=0; a< numAnswer; a++){
+            System.out.println("-------------------Check point a------------------------");
+            HashMap<String, String> answerInfo = new HashMap<String, String>();
+            // Common things of the two
+            // Name server
+            
+            hexStr_bytePointer+=2;
+            String qname = "";
+            String qnamepointerStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
+            int qnamepointer = Integer.parseInt(qnamepointerStr, 16)*2;
+            qname = pointerString(qnamepointer, message, qname);
+            qname = qname.substring(0, qname.length() - 1);
+            answerInfo.put("qname", qname);
+            hexStr_bytePointer+=READING_OFFSET;
+            System.out.println("-------------------Check point b------------------------");
+            // Type
+            String typeStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
+            int typeInt = Integer.parseInt(typeStr, 16);
+            String recordType = Integer.toString(typeInt);
+            answerInfo.put("type", recordType);
+            hexStr_bytePointer += TYPE_OFFSET;
+            System.out.println("-------------------Check point c------------------------");
+            // Class
+            String classStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
+            int classInt = Integer.parseInt(classStr, 16);
+            answerInfo.put("class", Integer.toString(classInt));
+            hexStr_bytePointer += CLASS_OFFSET;
+            System.out.println("-------------------Check point d------------------------");
 
-        System.out.println(String.format("Nameservers (%o)", name_server_count));
-        for(int ns=0; ns < name_server_count; ns++){
+            // TTL
+            String TTLStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+8);
+            int TTLInt = Integer.parseInt(TTLStr, 16);
+            answerInfo.put("TTL", Integer.toString(TTLInt));
+            hexStr_bytePointer += TTL_OFFSET;
+            System.out.println("-------------------Check point e------------------------");
+
+            // RLength
+            String RLengthStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
+            int RLength = Integer.parseInt(RLengthStr, 16);
+            hexStr_bytePointer += RLENGTH_OFFSET;
+            System.out.println("-------------------Check point f------------------------");
+
+            // RData
+            String Rdata = "";
+            if(recordType.equals("2") || recordType.equals("5")){
+                // IF TYPE NS OR CNAME
+                for(int j=0; j < RLength; j++){
+                    String datatempStr =  message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
+                    int datatempInt = Integer.parseInt(datatempStr, 16);
+    
+                    // CASE ONE where theres a pointer(compressed message)
+                    if(datatempStr.equals("C0")){
+                        hexStr_bytePointer+=2;
+                        String RdatapointerStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
+                        int Rdatapointer = Integer.parseInt(RdatapointerStr, 16)*2;  
+    
+                        Rdata = pointerString(Rdatapointer, message, Rdata);
+                        Rdata = Rdata.substring(0, Rdata.length() - 1);
+                        hexStr_bytePointer+=2;
+                        j+=4;
+                    } else {
+                    // CASE TWO where theres no pointer 
+                        for(int k=0; k < datatempInt; k++){
+                            hexStr_bytePointer+=2;
+                            j++;
+                            datatempStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
+                            
+                            String letter = ByteHelper.hexToAscii(datatempStr);
+                            Rdata += letter;
+                            
+
+                            
+                        }
+                        
+                        // Onto the next word
+                        hexStr_bytePointer+=2;
+                    }
+                    Rdata += ".";
+                }
+            } else if(recordType.equals("1")){
+                // IF TYPE A
+                for(int j=0; j < RLength; j++){
+                    String datatempStr =  message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
+                    int number = Integer.parseInt(datatempStr, 16);
+                    Rdata += number + ".";
+                    hexStr_bytePointer+=2;
+                }
+                // Rdata = Rdata.substring(0, Rdata.length() - 1);
+            } else if(recordType.equals("28")){
+                // If IPv6
+                // RLength is cut in half because IPv6 is read every four bits
+                for(int k=0; k < RLength/2; k++){                   
+                    // read every 4 index
+                    String datatempStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
+                    // remove leading zeros
+                    String number = datatempStr.replaceFirst("^0+(?!$)", "");
+                    // make sure 0 is kept 
+                    Rdata += number + ":";
+                    hexStr_bytePointer+=4;
+                }
+            }
+
+            System.out.println("-------------------Check point g------------------------");
+            // Removing extra "."
+            Rdata = Rdata.substring(0, Rdata.length() - 1);
+            answerInfo.put("Rdata", Rdata);
+
+            // Put each type in different list
+            // Type A
+            switch(answerInfo.get("type")){
+                // Type A
+                case "1":
+                    A_info.add(answerInfo);
+                    break;
+                // Type NS
+                case "2":
+                    NS_info.add(answerInfo);
+                    break;
+                // Type CNAME
+                case "5":
+                    CNAME_info.add(answerInfo);
+                    break;
+                // TYPE SOA
+                case "6":
+                    SOA_info.add(answerInfo);
+                    break;
+                // Type MX
+                case "15":
+                    MX_info.add(answerInfo);
+                    break;
+                // Type AAAA
+                case "28":
+                    AAAA_info.add(answerInfo);
+                    break;
+                // Type OTHER
+                case "0":
+                    OTHER_info.add(answerInfo);
+                    break;
+            }
+            answerRecord.add(answerInfo);
+            if(is_AA){
+                authoritativeAnswers.add(answerInfo);
+            }
+                       
+        }
+        System.out.println("-------------------Check point 11------------------------");
+        for(int ns=0; ns < numNameServer; ns++){
             HashMap<String, String> nameServerInfo = new HashMap<String, String>();
             // Common things of the two
             // Name server
@@ -117,17 +287,17 @@ public class DNSResponse extends DNSQuery{
     
                     // CASE ONE where theres a pointer(compressed message)
                     if(datatempStr.equals("C0")){
-                        hexStr_bytePointer+=2;
+                        hexStr_bytePointer+=READING_OFFSET;
                         String RdatapointerStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
                         int Rdatapointer = Integer.parseInt(RdatapointerStr, 16)*2;  
     
                         Rdata = pointerString(Rdatapointer, message, Rdata);
-                        hexStr_bytePointer+=2;
-                        j+=4;
+                        hexStr_bytePointer+=READING_OFFSET;
+                        j+=2;
                     } else {
                     // CASE TWO where theres no pointer 
                         for(int k=0; k < datatempInt; k++){
-                            hexStr_bytePointer+=2;
+                            hexStr_bytePointer+=READING_OFFSET;
                             j++;
                             datatempStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
                             String letter = ByteHelper.hexToAscii(datatempStr);
@@ -146,6 +316,18 @@ public class DNSResponse extends DNSQuery{
                     int number = Integer.parseInt(datatempStr, 16);
                     Rdata += number + ".";
                     hexStr_bytePointer+=2;
+                }
+            } else if(recordType.equals("28")){
+                // If IPv6
+                // RLength is cut in half because IPv6 is read every four bits
+                for(int k=0; k < RLength/2; k++){                   
+                    // read every 4 index
+                    String datatempStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
+                    // remove leading zeros
+                    String number = datatempStr.replaceFirst("^0+(?!$)", "");
+                    // make sure 0 is kept 
+                    Rdata += number + ":";
+                    hexStr_bytePointer+=4;
                 }
             }
             
@@ -185,12 +367,12 @@ public class DNSResponse extends DNSQuery{
                     OTHER_info.add(nameServerInfo);
                     break;
             }
-            System.out.println("    " + nameServerInfo.get("qname") + " " + RecordType.getByCode(Integer.parseInt(nameServerInfo.get("type"))) + " " + nameServerInfo.get("class") + " " + nameServerInfo.get("TTL") + " " + nameServerInfo.get("Rdata"));
+            nameServerRecord.add(nameServerInfo);
             
         }
-
-        System.out.println(String.format("Additional Information (%o)", additional_record_count));
-        for(int aa=0; aa < additional_record_count; aa++){
+        System.out.println("-------------------Check point 12------------------------");
+        for(int aa=0; aa < numAdditionalRecord; aa++){
+            System.out.println(aa);
             HashMap<String, String> additionalInfo = new HashMap<String, String>();
             // Common things of the two
             // Name server
@@ -198,7 +380,7 @@ public class DNSResponse extends DNSQuery{
             // CHECK IF IT HAS C0 OR NOT
             String qname = "";
             String qnameStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);   
-            if(qnameStr.equals("C0")){
+            if(qnameStr.equals("C0") || qnameStr.equals("C1") ){
                 hexStr_bytePointer+=2;
                 String qnamepointerStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
                 int qnamepointer = Integer.parseInt(qnamepointerStr, 16)*2;
@@ -219,7 +401,7 @@ public class DNSResponse extends DNSQuery{
                 qname = qname.substring(0, qname.length() - 1);
                 hexStr_bytePointer+=2;
             }
-            
+            System.out.println("-------------------Check point a------------------------");
             additionalInfo.put("qname", qname);
             hexStr_bytePointer+=2;
 
@@ -230,31 +412,63 @@ public class DNSResponse extends DNSQuery{
             String recordType = Integer.toString(typeInt);
             additionalInfo.put("type", recordType);
             hexStr_bytePointer += 4;
-
+            System.out.println("-------------------Check point b------------------------");
             // Class
             String classStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);   
             int classInt = Integer.parseInt(classStr, 16);
             additionalInfo.put("class", Integer.toString(classInt));
             hexStr_bytePointer += 4;
 
-
+            System.out.println("-------------------Check point c------------------------");
             // TTL
             String TTLStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+8);
             // TODO ERROR FOUND HERE
             int TTLInt = Integer.parseInt(TTLStr, 16);
             additionalInfo.put("TTL", Integer.toString(TTLInt));
             hexStr_bytePointer += 8;
-
+            System.out.println("-------------------Check point d------------------------");
             // RLength
             String RLengthStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+4);
             int RLength = Integer.parseInt(RLengthStr, 16);
             hexStr_bytePointer += 4;
 
-
+            System.out.println("-------------------Check point e------------------------");
             // RData TODO 
             // If IPv4 
             String Rdata = "";  
-            if(recordType.equals("1")){  
+            if(recordType.equals("2") || recordType.equals("5")){
+                // IF TYPE NS OR CNAME
+                for(int j=0; j < RLength; j++){
+                    String datatempStr =  message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
+                    int datatempInt = Integer.parseInt(datatempStr, 16);
+    
+                    // CASE ONE where theres a pointer(compressed message)
+                    if(datatempStr.equals("C0")){
+                        hexStr_bytePointer+=READING_OFFSET;
+                        String RdatapointerStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
+                        int Rdatapointer = Integer.parseInt(RdatapointerStr, 16)*2;  
+    
+                        Rdata = pointerString(Rdatapointer, message, Rdata);
+                        hexStr_bytePointer+=READING_OFFSET;
+                        Rdata = Rdata.substring(0, Rdata.length() - 1);
+                        j+=2;
+                    } else {
+                    // CASE TWO where theres no pointer 
+                        for(int k=0; k < datatempInt; k++){
+                            hexStr_bytePointer+=READING_OFFSET;
+                            j++;
+                            datatempStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
+                            String letter = ByteHelper.hexToAscii(datatempStr);
+                            Rdata += letter;
+                        }
+                        
+                        // Onto the next word
+                        hexStr_bytePointer+=2;
+                    }
+                    Rdata += ".";
+                }
+            } else if(recordType.equals("1")){
+                // IF TYPE A
                 for(int j=0; j < RLength; j++){
                     String datatempStr =  message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
                     int number = Integer.parseInt(datatempStr, 16);
@@ -273,41 +487,16 @@ public class DNSResponse extends DNSQuery{
                     Rdata += number + ":";
                     hexStr_bytePointer+=4;
                 }
-            } else if(recordType.equals("2") || recordType.equals("5")){
-                // If CNAME
-                for(int j=0; j < RLength; j++){
-                    String datatempStr =  message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
-                    int datatempInt = Integer.parseInt(datatempStr, 16);
-    
-                    // CASE ONE where theres a pointer(compressed message)
-                    if(datatempStr.equals("C0")){
-                        hexStr_bytePointer+=2;
-                        String RdatapointerStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
-                        int Rdatapointer = Integer.parseInt(RdatapointerStr, 16)*2;  
-    
-                        Rdata = pointerString(Rdatapointer, message, Rdata);
-                        hexStr_bytePointer+=2;
-                        j+=4;
-                    } else {
-    
-                    // CASE TWO where theres no pointer 
-                        for(int k=0; k < datatempInt; k++){
-                            hexStr_bytePointer+=2;
-                            j++;
-                            datatempStr = message.substring(hexStr_bytePointer, hexStr_bytePointer+2);
-                            String letter = ByteHelper.hexToAscii(datatempStr);
-                            Rdata += letter;
-                        }
-                        
-                        // Onto the next word
-                        hexStr_bytePointer+=2;
-                    }
-                    Rdata += ".";
-                }             
+            }
+          
+            System.out.println("-------------------Check point j------------------------");
+            System.out.println(Rdata);
+            if(Rdata.length() >= 1){
+                System.out.println("In Rdata if");
                 Rdata = Rdata.substring(0, Rdata.length() - 1);
             }
-
-            Rdata = Rdata.substring(0, Rdata.length() - 1);
+            
+            System.out.println("below Rdata");
             additionalInfo.put("Rdata", Rdata);
             
 
@@ -343,11 +532,10 @@ public class DNSResponse extends DNSQuery{
                     OTHER_info.add(additionalInfo);
                     break;
             }       
-
-            System.out.println("    " + additionalInfo.get("qname") + " " + RecordType.getByCode(Integer.parseInt(additionalInfo.get("type")))  + " " + additionalInfo.get("class") + " " + additionalInfo.get("TTL") + " " + additionalInfo.get("Rdata"));            
-
-        }
+            additionalRecord.add(additionalInfo);
             
+        }
+        System.out.println("-------------------Check point 13------------------------");
     }
 
     private static String pointerString(int pointer, String message, String pointerMessage){
@@ -413,4 +601,63 @@ public class DNSResponse extends DNSQuery{
         hexStr_bytePointer = pointer;
     }
 
+    private static boolean is_authoritative(int pointer, String response){
+        String QRStr = response.substring(hexStr_bytePointer, hexStr_bytePointer+4);
+        int QRInt = Integer.parseInt(QRStr, 16);
+        String QRBinary = Integer.toBinaryString(QRInt); 
+        char is_authoritative = QRBinary.charAt(5);
+        if(is_authoritative == '1'){
+            return true;
+        } else {
+            return false;
+        }       
+    }
+
+    private static String extract_Rdata(int pointer, String response){
+        return "";
+    }
+
+    public static String getQNAME(HashMap<String, String> lst){
+        String ans = lst.get("qname");
+        return ans;
+    }
+
+    public static String getType(HashMap<String, String> lst){
+        String ans = lst.get("type");
+        return ans;
+    }
+
+    public static String getTTL(HashMap<String, String> lst){
+        String ans = lst.get("TTL");
+        return ans;
+    }
+
+    public static String getRdata(HashMap<String, String> lst){
+        String ans = lst.get("Rdata");
+        return ans;
+    }
+
+    public static void clearList(){
+        A_info.clear();
+        AAAA_info.clear();
+        CNAME_info.clear();
+        NS_info.clear();
+        MX_info.clear();
+        SOA_info.clear();
+        OTHER_info.clear();
+        answerRecord.clear();
+        nameServerRecord.clear();
+        additionalRecord.clear();
+        authoritativeAnswers.clear();
+    }
+
+    private static String getNS_CNAME(){
+        return "";
+    }
+    private static String getAAAA(){
+        return "";
+    }
+    private static String getA(){
+        return "";
+    }
 }
