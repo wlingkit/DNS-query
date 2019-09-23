@@ -196,18 +196,10 @@ public class DNSLookupService {
         // ONCE YOU FOUND ANOTHER IPV4, CHANGE BACK THE HOSTNAME
 
         // CASE TWO. NO A TYPE AND NOT AUTHORITATIVE
-        if(!DNSResponse.NS_info.isEmpty() && !DNSResponse.is_AA && DNSResponse.A_info.isEmpty()) {
-            indirectionLevel++;
-            String newIPv4Str = resolveDEADEND(node);
-            try{
-                InetAddress newIPv4 = InetAddress.getByName(newIPv4Str);
-                retrieveResultsFromServer(node, newIPv4);
-            } catch(Exception e){
-                System.out.println(e);
-            }
-            
-        } else if(!DNSResponse.CNAME_info.isEmpty()){
+        if(!DNSResponse.CNAME_info.isEmpty() && DNSResponse.NS_info.isEmpty() && DNSResponse.A_info.isEmpty()){
         // CASE THREE. NO A AND NO NS. CHECK FOR CNAME
+        
+            System.out.println("-------------------3--------------------");
             String newHost = DNSResponse.CNAME_info.get(0).get("Rdata");
             DNSNode newNode = new DNSNode(newHost, node.getType());
             getResults(newNode, indirectionLevel+1);
@@ -239,10 +231,7 @@ public class DNSLookupService {
         }
 
         // Sending request
-
         send_message(encoded_message, server, DEFAULT_DNS_PORT);
-
-        
 
         // Recieving answer 
         DNSResponse.clearList();
@@ -256,17 +245,26 @@ public class DNSLookupService {
         if(!DNSResponse.is_AA){
             // Resend with different IPv4
             if(!DNSResponse.A_info.isEmpty()){
+                System.out.println("-------------------1--------------------");
                 String newAddress = DNSResponse.A_info.get(resendCounter).get("Rdata");
-                System.out.println(DNSResponse.A_info.get(0).get("Rdata"));
                 try{
                     InetAddress newServer = InetAddress.getByName(newAddress);
-                    System.out.println(newServer);
-                    System.out.println(node.getHostName());
-                    System.out.println(node.getType());
                     retrieveResultsFromServer(node, newServer);
                 } catch(Exception e){
                     System.out.println(e);
                 }
+            } else if(!DNSResponse.NS_info.isEmpty()){
+                String newIPv4Str = resolveDEADEND(node);
+            
+                System.out.println("-------------------2--------------------");
+                try{
+                    InetAddress newIPv4 = InetAddress.getByName(newIPv4Str);
+                    retrieveResultsFromServer(node, newIPv4);
+                } catch(Exception e){
+                    System.out.println(e);
+                }
+                
+                
             }
         }           
     }
@@ -289,24 +287,27 @@ public class DNSLookupService {
         for(int i=0; i < DNSResponse.answerRecord.size(); i++){
             ResourceRecord rrTemp = toResoureRecord(node, DNSResponse.answerRecord.get(i));
             String typeStr = DNSResponse.answerRecord.get(i).get("type");
+            String qname = DNSResponse.answerRecord.get(i).get("qname");
             int typeInt = Integer.parseInt(typeStr);
-            verbosePrintResourceRecord(rrTemp, typeInt);
+            verbosePrintResourceRecord(rrTemp, typeInt, qname);
         }
 
         System.out.printf("Name Servers [%s]\n", DNSResponse.numNameServer);
         for(int i=0; i < DNSResponse.nameServerRecord.size(); i++){
             ResourceRecord rrTemp = toResoureRecord(node, DNSResponse.nameServerRecord.get(i));
             String typeStr = DNSResponse.nameServerRecord.get(i).get("type");
+            String qname = DNSResponse.nameServerRecord.get(i).get("qname");
             int typeInt = Integer.parseInt(typeStr);
-            verbosePrintResourceRecord(rrTemp, typeInt);
+            verbosePrintResourceRecord(rrTemp, typeInt, qname);
         }
 
         System.out.printf("Additional Records [%s]\n", DNSResponse.numAdditionalRecord);
         for(int i=0; i < DNSResponse.additionalRecord.size(); i++){
             ResourceRecord rrTemp = toResoureRecord(node, DNSResponse.additionalRecord.get(i));
             String typeStr = DNSResponse.additionalRecord.get(i).get("type");
+            String qname = DNSResponse.additionalRecord.get(i).get("qname");
             int typeInt = Integer.parseInt(typeStr);
-            verbosePrintResourceRecord(rrTemp, typeInt);
+            verbosePrintResourceRecord(rrTemp, typeInt, qname);
         }
         // resourceRecordFormat("Answers", qr);
         // resourceRecordFormat("Nameservers", qr);
@@ -314,9 +315,10 @@ public class DNSLookupService {
     }
     
 
-    private static void verbosePrintResourceRecord(ResourceRecord record, int rtype) {
+    private static void verbosePrintResourceRecord(ResourceRecord record, int rtype, String qname) {
         if (verboseTracing)
-            System.out.format("       %-30s %-10d %-4s %s\n", record.getHostName(),
+        //ecord.getHostName()
+            System.out.format("       %-30s %-10d %-4s %s\n", qname,
                     record.getTTL(),
                     record.getType() == RecordType.OTHER ? rtype : record.getType(),
                     record.getTextResult());
@@ -415,7 +417,7 @@ public class DNSLookupService {
     private static String resolveDEADEND(DNSNode node){
         // Make new node
         // get ipv4
-        // 
+        System.out.println("-------------------4------------------------");
         String newHost = DNSResponse.NS_info.get(resendCounter).get("Rdata");
         DNSNode newNode = new DNSNode(newHost, node.getType());
         
@@ -434,7 +436,31 @@ public class DNSLookupService {
         if(verboseTracing){
             FormatResponseTrace(newNode);
         }
-       
+        if(!DNSResponse.is_AA){
+            // Resend with different IPv4
+            if(!DNSResponse.A_info.isEmpty()){
+                System.out.println("-------------------5--------------------");
+                String newAddress = DNSResponse.A_info.get(resendCounter).get("Rdata");
+                try{
+                    InetAddress newServer = InetAddress.getByName(newAddress);
+                    retrieveResultsFromServer(node, newServer);
+                } catch(Exception e){
+                    System.out.println(e);
+                }
+            } else if(!DNSResponse.NS_info.isEmpty()){
+                String newIPv4Str = resolveDEADEND(node);
+            
+                System.out.println("-------------------6--------------------");
+                try{
+                    InetAddress newIPv4 = InetAddress.getByName(newIPv4Str);
+                    retrieveResultsFromServer(node, newIPv4);
+                } catch(Exception e){
+                    System.out.println(e);
+                }
+                
+                
+            }
+        }  
         
         String newAddress = DNSResponse.A_info.get(resendCounter).get("Rdata");
         

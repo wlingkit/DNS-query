@@ -14,6 +14,7 @@ public class DNSQuery{
     private static String NUM_AUTHORITY_RECORDS = "0000";
     private static String NUM_ADDITIONAL_RECORDS = "0000";
     public static String qnameStr = "";
+    public static String qtype = "";
 
        // Encoding message for send up
     // Message structure: message = "AA AA |01 00           |  00 01  | 00 00 |00 00            |00 00              |07 65 78 61 6d 70 6c 65 03 63 6f 6d 00| 00 01| 00 01"
@@ -89,7 +90,7 @@ public class DNSQuery{
         // Qtype - two bytes [00][.getType]
         String qtype_hexStr = qtype_encode(node);
         
-        String qtype = "";
+        qtype = "";
         if(qtype_hexStr.length() == 1){
             qtype += "000" + qtype_hexStr;
         } else if(qtype_hexStr.length() == 2){
@@ -101,16 +102,11 @@ public class DNSQuery{
 
         // Figure out now many bytes you need 16 + qname every letter is a byte
         message = rand_id + query_parameters + NUM_OF_QUESTIONS + NUM_OF_ANSWERS + NUM_AUTHORITY_RECORDS + NUM_ADDITIONAL_RECORDS + qname + qtype + qclass;
-        System.out.println(message);
         byte[] message_byteArray = ByteHelper.hexStringToByteArray(message);
 
         // String message = id_str + query_parameters + num_question + num_answer + authority_record + additional_record + qname + qtype + qclass;
         return message_byteArray;
     }
-
-
-
-    
 
     private static String qtype_encode(DNSNode node){
         int type = node.getType().getCode();

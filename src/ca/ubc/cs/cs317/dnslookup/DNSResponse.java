@@ -64,7 +64,6 @@ public class DNSResponse extends DNSQuery{
         String numAnswerStr = message.substring(globalPointer, globalPointer+4);
         numAnswer = Integer.parseInt(numAnswerStr, 16);
         recordAmount[0] = numAnswer;
-        System.out.println("numAnswer: "+ numAnswer);
         globalPointer+=ANCOUNT_OFFSET;
 
         // Number of name servers
@@ -73,14 +72,12 @@ public class DNSResponse extends DNSQuery{
         numNameServer = Integer.parseInt(numNameServerStr, 16);
         recordAmount[1] = numNameServer;
         globalPointer+=NSCOUNT_OFFSET;
-        System.out.println("numNameServer: "+ numNameServer);
 
         // Number of additional records
         
         String numAdditionalRecordStr = message.substring(globalPointer, globalPointer+4);
         numAdditionalRecord = Integer.parseInt(numAdditionalRecordStr, 16);
         recordAmount[2] = numAdditionalRecord;
-        System.out.println("numAdditionalRecord: "+ numAdditionalRecord);
         globalPointer+=ARCOUNT_OFFSET;
 
         String pointerStr = message.substring(globalPointer, globalPointer+2);
@@ -100,448 +97,6 @@ public class DNSResponse extends DNSQuery{
                 resolveRecord(message, section);
             }       
         }
-        // for(int a=0; a< numAnswer; a++){
-        //     System.out.println("-------------------Check point a------------------------");
-        //     HashMap<String, String> answerInfo = new HashMap<String, String>();
-        //     // Common things of the two
-        //     // Name server
-            
-        //     globalPointer+=2;
-        //     String qname = "";
-        //     String qnamepointerStr = message.substring(globalPointer, globalPointer+2);
-        //     int qnamepointer = Integer.parseInt(qnamepointerStr, 16)*2;
-        //     qname = compressedReferece(qnamepointer, message, qname);
-        //     qname = qname.substring(0, qname.length() - 1);
-        //     answerInfo.put("qname", qname);
-        //     globalPointer+=READING_OFFSET;
-        //     System.out.println("-------------------Check point b------------------------");
-        //     // Type
-        //     String typeStr = message.substring(globalPointer, globalPointer+4);
-        //     int typeInt = Integer.parseInt(typeStr, 16);
-        //     String recordType = Integer.toString(typeInt);
-        //     answerInfo.put("type", recordType);
-        //     globalPointer += TYPE_OFFSET;
-        //     System.out.println("-------------------Check point c------------------------");
-        //     // Class
-        //     String classStr = message.substring(globalPointer, globalPointer+4);
-        //     int classInt = Integer.parseInt(classStr, 16);
-        //     answerInfo.put("class", Integer.toString(classInt));
-        //     globalPointer += CLASS_OFFSET;
-        //     System.out.println("-------------------Check point d------------------------");
-
-        //     // TTL
-        //     String TTLStr = message.substring(globalPointer, globalPointer+8);
-        //     int TTLInt = Integer.parseInt(TTLStr, 16);
-        //     answerInfo.put("TTL", Integer.toString(TTLInt));
-        //     globalPointer += TTL_OFFSET;
-        //     System.out.println("-------------------Check point e------------------------");
-
-        //     // RLength
-        //     String RLengthStr = message.substring(globalPointer, globalPointer+4);
-        //     int RLength = Integer.parseInt(RLengthStr, 16);
-        //     globalPointer += RLENGTH_OFFSET;
-        //     System.out.println("-------------------Check point f------------------------");
-
-        //     // RData
-        //     String Rdata = "";
-        //     if(recordType.equals("2") || recordType.equals("5")){
-        //         // IF TYPE NS OR CNAME
-        //         for(int j=0; j < RLength; j++){
-        //             String datatempStr =  message.substring(globalPointer, globalPointer+2);
-        //             int datatempInt = Integer.parseInt(datatempStr, 16);
-    
-        //             // CASE ONE where theres a pointer(compressed message)
-        //             if(datatempStr.equals("C0")){
-        //                 globalPointer+=2;
-        //                 String RdatapointerStr = message.substring(globalPointer, globalPointer+2);
-        //                 int Rdatapointer = Integer.parseInt(RdatapointerStr, 16)*2;  
-    
-        //                 Rdata = compressedReferece(Rdatapointer, message, Rdata);
-        //                 Rdata = Rdata.substring(0, Rdata.length() - 1);
-        //                 globalPointer+=2;
-        //                 j+=4;
-        //             } else {
-        //             // CASE TWO where theres no pointer 
-        //                 for(int k=0; k < datatempInt; k++){
-        //                     globalPointer+=2;
-        //                     j++;
-        //                     datatempStr = message.substring(globalPointer, globalPointer+2);
-                            
-        //                     String letter = ByteHelper.hexToAscii(datatempStr);
-        //                     Rdata += letter;
-                            
-
-                            
-        //                 }
-                        
-        //                 // Onto the next word
-        //                 globalPointer+=2;
-        //             }
-        //             Rdata += ".";
-        //         }
-        //     } else if(recordType.equals("1")){
-        //         // IF TYPE A
-        //         for(int j=0; j < RLength; j++){
-        //             String datatempStr =  message.substring(globalPointer, globalPointer+2);
-        //             int number = Integer.parseInt(datatempStr, 16);
-        //             Rdata += number + ".";
-        //             globalPointer+=2;
-        //         }
-        //         // Rdata = Rdata.substring(0, Rdata.length() - 1);
-        //     } else if(recordType.equals("28")){
-        //         // If IPv6
-        //         // RLength is cut in half because IPv6 is read every four bits
-        //         for(int k=0; k < RLength/2; k++){                   
-        //             // read every 4 index
-        //             String datatempStr = message.substring(globalPointer, globalPointer+4);
-        //             // remove leading zeros
-        //             String number = datatempStr.replaceFirst("^0+(?!$)", "");
-        //             // make sure 0 is kept 
-        //             Rdata += number + ":";
-        //             globalPointer+=4;
-        //         }
-        //     }
-
-        //     System.out.println("-------------------Check point g------------------------");
-        //     // Removing extra "."
-        //     Rdata = Rdata.substring(0, Rdata.length() - 1);
-        //     answerInfo.put("Rdata", Rdata);
-
-        //     // Put each type in different list
-        //     // Type A
-        //     switch(answerInfo.get("type")){
-        //         // Type A
-        //         case "1":
-        //             A_info.add(answerInfo);
-        //             break;
-        //         // Type NS
-        //         case "2":
-        //             NS_info.add(answerInfo);
-        //             break;
-        //         // Type CNAME
-        //         case "5":
-        //             CNAME_info.add(answerInfo);
-        //             break;
-        //         // TYPE SOA
-        //         case "6":
-        //             SOA_info.add(answerInfo);
-        //             break;
-        //         // Type MX
-        //         case "15":
-        //             MX_info.add(answerInfo);
-        //             break;
-        //         // Type AAAA
-        //         case "28":
-        //             AAAA_info.add(answerInfo);
-        //             break;
-        //         // Type OTHER
-        //         case "0":
-        //             OTHER_info.add(answerInfo);
-        //             break;
-        //     }
-        //     answerRecord.add(answerInfo);
-        //     if(is_AA){
-        //         authoritativeAnswers.add(answerInfo);
-        //     }
-                       
-        // }
-        // System.out.println("-------------------Check point 11------------------------");
-        // for(int ns=0; ns < numNameServer; ns++){
-        //     HashMap<String, String> nameServerInfo = new HashMap<String, String>();
-        //     // Common things of the two
-        //     // Name server
-        //     String qname = "";
-        //     globalPointer+=2;
-        //     String qnamepointerStr = message.substring(globalPointer, globalPointer+2);
-        //     int qnamepointer = Integer.parseInt(qnamepointerStr, 16)*2;
-        //     qname = compressedReferece(qnamepointer, message, qname);
-        //     qname = qname.substring(0, qname.length() - 1);
-        //     nameServerInfo.put("qname", qname);
-        //     globalPointer+=2;
-
-        //     // Type
-        //     String typeStr = message.substring(globalPointer, globalPointer+4);
-        //     int typeInt = Integer.parseInt(typeStr, 16);
-        //     String recordType = Integer.toString(typeInt);
-        //     nameServerInfo.put("type", recordType);
-        //     globalPointer += 4;
-
-        //     // Class
-        //     String classStr = message.substring(globalPointer, globalPointer+4);
-        //     int classInt = Integer.parseInt(classStr, 16);
-        //     nameServerInfo.put("class", Integer.toString(classInt));
-        //     globalPointer += 4;
-
-
-        //     // TTL
-        //     String TTLStr = message.substring(globalPointer, globalPointer+8);
-        //     int TTLInt = Integer.parseInt(TTLStr, 16);
-        //     nameServerInfo.put("TTL", Integer.toString(TTLInt));
-        //     globalPointer += 8;
-
-        //     // RLength
-        //     String RLengthStr = message.substring(globalPointer, globalPointer+4);
-        //     int RLength = Integer.parseInt(RLengthStr, 16);
-        //     globalPointer += 4;
-
-        //     // RData
-        //     String Rdata = "";
-        //     if(recordType.equals("2") || recordType.equals("5")){
-        //         // IF TYPE NS OR CNAME
-        //         for(int j=0; j < RLength; j++){
-        //             String datatempStr =  message.substring(globalPointer, globalPointer+2);
-        //             int datatempInt = Integer.parseInt(datatempStr, 16);
-    
-        //             // CASE ONE where theres a pointer(compressed message)
-        //             if(datatempStr.equals("C0")){
-        //                 globalPointer+=READING_OFFSET;
-        //                 String RdatapointerStr = message.substring(globalPointer, globalPointer+2);
-        //                 int Rdatapointer = Integer.parseInt(RdatapointerStr, 16)*2;  
-    
-        //                 Rdata = compressedReferece(Rdatapointer, message, Rdata);
-        //                 globalPointer+=READING_OFFSET;
-        //                 j+=2;
-        //             } else {
-        //             // CASE TWO where theres no pointer 
-        //                 for(int k=0; k < datatempInt; k++){
-        //                     globalPointer+=READING_OFFSET;
-        //                     j++;
-        //                     datatempStr = message.substring(globalPointer, globalPointer+2);
-        //                     String letter = ByteHelper.hexToAscii(datatempStr);
-        //                     Rdata += letter;
-        //                 }
-                        
-        //                 // Onto the next word
-        //                 globalPointer+=2;
-        //             }
-        //             Rdata += ".";
-        //         }
-        //     } else if(recordType.equals("1")){
-        //         // IF TYPE A
-        //         for(int j=0; j < RLength; j++){
-        //             String datatempStr =  message.substring(globalPointer, globalPointer+2);
-        //             int number = Integer.parseInt(datatempStr, 16);
-        //             Rdata += number + ".";
-        //             globalPointer+=2;
-        //         }
-        //     } else if(recordType.equals("28")){
-        //         // If IPv6
-        //         // RLength is cut in half because IPv6 is read every four bits
-        //         for(int k=0; k < RLength/2; k++){                   
-        //             // read every 4 index
-        //             String datatempStr = message.substring(globalPointer, globalPointer+4);
-        //             // remove leading zeros
-        //             String number = datatempStr.replaceFirst("^0+(?!$)", "");
-        //             // make sure 0 is kept 
-        //             Rdata += number + ":";
-        //             globalPointer+=4;
-        //         }
-        //     }
-            
-        //     // Removing extra "."
-        //     Rdata = Rdata.substring(0, Rdata.length() - 2);
-        //     nameServerInfo.put("Rdata", Rdata);
-
-        //     // Put each type in different list
-        //     // Type A
-        //     switch(nameServerInfo.get("type")){
-        //         // Type A
-        //         case "1":
-        //             A_info.add(nameServerInfo);
-        //             break;
-        //         // Type NS
-        //         case "2":
-        //             NS_info.add(nameServerInfo);
-        //             break;
-        //         // Type CNAME
-        //         case "5":
-        //             CNAME_info.add(nameServerInfo);
-        //             break;
-        //         // TYPE SOA
-        //         case "6":
-        //             SOA_info.add(nameServerInfo);
-        //             break;
-        //         // Type MX
-        //         case "15":
-        //             MX_info.add(nameServerInfo);
-        //             break;
-        //         // Type AAAA
-        //         case "28":
-        //             AAAA_info.add(nameServerInfo);
-        //             break;
-        //         // Type OTHER
-        //         case "0":
-        //             OTHER_info.add(nameServerInfo);
-        //             break;
-        //     }
-        //     nameServerRecord.add(nameServerInfo);
-            
-        // }
-        // System.out.println("-------------------Check point 12------------------------");
-        // for(int aa=0; aa < numAdditionalRecord; aa++){
-        //     System.out.println(aa);
-        //     HashMap<String, String> additionalInfo = new HashMap<String, String>();
-        //     // Common things of the two
-        //     // Name server
-        //     // at 181 OFF SET
-        //     // CHECK IF IT HAS C0 OR NOT
-        //     String qname = "";
-        //     String qnameStr = message.substring(globalPointer, globalPointer+2);   
-        //     if(qnameStr.equals("C0") || qnameStr.equals("C1") ){
-        //         globalPointer+=2;
-        //         String qnamepointerStr = message.substring(globalPointer, globalPointer+2);
-        //         int qnamepointer = Integer.parseInt(qnamepointerStr, 16)*2;
-        //         qname = compressedReferece(qnamepointer, message, qname);
-        //         qname = qname.substring(0, qname.length() - 1);
-        //     } else {
-        //         int qnameStrLength = Integer.parseInt(qnameStr, 16);
-        //         for(int i=0; i<qnameStrLength;i++){
-        //             globalPointer+=2;
-        //             String qnameTempStr = message.substring(globalPointer, globalPointer+2);
-        //             String letter = ByteHelper.hexToAscii(qnameTempStr);
-        //             qname+=letter;
-        //         }
-        //         globalPointer+=2;
-        //         String qnamepointerStr = message.substring(globalPointer, globalPointer+2);
-        //         int qnamepointer = Integer.parseInt(qnamepointerStr, 16)*2;
-        //         qname += compressedReferece(qnamepointer, message, qname);
-        //         qname = qname.substring(0, qname.length() - 1);
-        //         globalPointer+=2;
-        //     }
-        //     System.out.println("-------------------Check point a------------------------");
-        //     additionalInfo.put("qname", qname);
-        //     globalPointer+=2;
-
-        //     // Type
-        //     // At 183 OFF SET
-        //     String typeStr = message.substring(globalPointer, globalPointer+4);
-        //     int typeInt = Integer.parseInt(typeStr, 16);
-        //     String recordType = Integer.toString(typeInt);
-        //     additionalInfo.put("type", recordType);
-        //     globalPointer += 4;
-        //     System.out.println("-------------------Check point b------------------------");
-        //     // Class
-        //     String classStr = message.substring(globalPointer, globalPointer+4);   
-        //     int classInt = Integer.parseInt(classStr, 16);
-        //     additionalInfo.put("class", Integer.toString(classInt));
-        //     globalPointer += 4;
-
-        //     System.out.println("-------------------Check point c------------------------");
-        //     // TTL
-        //     String TTLStr = message.substring(globalPointer, globalPointer+8);
-        //     // TODO ERROR FOUND HERE
-        //     int TTLInt = Integer.parseInt(TTLStr, 16);
-        //     additionalInfo.put("TTL", Integer.toString(TTLInt));
-        //     globalPointer += 8;
-        //     System.out.println("-------------------Check point d------------------------");
-        //     // RLength
-        //     String RLengthStr = message.substring(globalPointer, globalPointer+4);
-        //     int RLength = Integer.parseInt(RLengthStr, 16);
-        //     globalPointer += 4;
-
-        //     System.out.println("-------------------Check point e------------------------");
-        //     // RData TODO 
-        //     // If IPv4 
-        //     String Rdata = "";  
-        //     if(recordType.equals("2") || recordType.equals("5")){
-        //         // IF TYPE NS OR CNAME
-        //         for(int j=0; j < RLength; j++){
-        //             String datatempStr =  message.substring(globalPointer, globalPointer+2);
-        //             int datatempInt = Integer.parseInt(datatempStr, 16);
-    
-        //             // CASE ONE where theres a pointer(compressed message)
-        //             if(datatempStr.equals("C0")){
-        //                 globalPointer+=READING_OFFSET;
-        //                 String RdatapointerStr = message.substring(globalPointer, globalPointer+2);
-        //                 int Rdatapointer = Integer.parseInt(RdatapointerStr, 16)*2;  
-    
-        //                 Rdata = compressedReferece(Rdatapointer, message, Rdata);
-        //                 globalPointer+=READING_OFFSET;
-        //                 Rdata = Rdata.substring(0, Rdata.length() - 1);
-        //                 j+=2;
-        //             } else {
-        //             // CASE TWO where theres no pointer 
-        //                 for(int k=0; k < datatempInt; k++){
-        //                     globalPointer+=READING_OFFSET;
-        //                     j++;
-        //                     datatempStr = message.substring(globalPointer, globalPointer+2);
-        //                     String letter = ByteHelper.hexToAscii(datatempStr);
-        //                     Rdata += letter;
-        //                 }
-                        
-        //                 // Onto the next word
-        //                 globalPointer+=2;
-        //             }
-        //             Rdata += ".";
-        //         }
-        //     } else if(recordType.equals("1")){
-        //         // IF TYPE A
-        //         for(int j=0; j < RLength; j++){
-        //             String datatempStr =  message.substring(globalPointer, globalPointer+2);
-        //             int number = Integer.parseInt(datatempStr, 16);
-        //             Rdata += number + ".";
-        //             globalPointer+=2;
-        //         }
-        //     } else if(recordType.equals("28")){
-        //         // If IPv6
-        //         // RLength is cut in half because IPv6 is read every four bits
-        //         for(int k=0; k < RLength/2; k++){                   
-        //             // read every 4 index
-        //             String datatempStr = message.substring(globalPointer, globalPointer+4);
-        //             // remove leading zeros
-        //             String number = datatempStr.replaceFirst("^0+(?!$)", "");
-        //             // make sure 0 is kept 
-        //             Rdata += number + ":";
-        //             globalPointer+=4;
-        //         }
-        //     }
-          
-        //     System.out.println("-------------------Check point j------------------------");
-        //     System.out.println(Rdata);
-        //     if(Rdata.length() >= 1){
-        //         System.out.println("In Rdata if");
-        //         Rdata = Rdata.substring(0, Rdata.length() - 1);
-        //     }
-            
-        //     System.out.println("below Rdata");
-        //     additionalInfo.put("Rdata", Rdata);
-            
-
-        //     // Put each type in different list
-        //     // Type A
-        //     switch(additionalInfo.get("type")){
-        //         // Type A
-        //         case "1":
-        //             A_info.add(additionalInfo);
-        //             break;
-        //         // Type NS
-        //         case "2":
-        //             NS_info.add(additionalInfo);
-        //             break;
-        //         // Type CNAME
-        //         case "5":
-        //             CNAME_info.add(additionalInfo);
-        //             break;
-        //         // TYPE SOA
-        //         case "6":
-        //             SOA_info.add(additionalInfo);
-        //             break;
-        //         // Type MX
-        //         case "15":
-        //             MX_info.add(additionalInfo);
-        //             break;
-        //         // Type AAAA
-        //         case "28":
-        //             AAAA_info.add(additionalInfo);
-        //             break;
-        //         // Type OTHER
-        //         case "0":
-        //             OTHER_info.add(additionalInfo);
-        //             break;
-        //     }       
-        //     additionalRecord.add(additionalInfo);
-            
-        // }
     }
 
     private static String compressedReferece(int pointer, String message, String pointerMessage){
@@ -554,6 +109,13 @@ public class DNSResponse extends DNSQuery{
         if(termamountStr.equals("C0")){
             pointer += 2;
             String pointStr = message.substring(pointer, pointer+2);
+            int pointTo = Integer.parseInt(pointStr, 16)*2;
+            return compressedReferece(pointTo, message, pointerMessage);
+        }
+
+        if(termamountStr.equals("C1")){
+            pointer+=1;
+            String pointStr = message.substring(pointer, pointer+3);
             int pointTo = Integer.parseInt(pointStr, 16)*2;
             return compressedReferece(pointTo, message, pointerMessage);
         }
@@ -609,7 +171,9 @@ public class DNSResponse extends DNSQuery{
         switch(answerSection){
             case 0:
                 answerRecord.add(decordedRecord);
-                if(is_AA){
+                if(is_AA && DNSQuery.qtype.equals("0001") && recordType.equals("1")){
+                    authoritativeAnswers.add(decordedRecord);
+                } else if(is_AA && DNSQuery.qtype.equals("0005") && recordType.equals("5")){
                     authoritativeAnswers.add(decordedRecord);
                 }
                 break;
@@ -623,7 +187,7 @@ public class DNSResponse extends DNSQuery{
                 System.err.println("Incorrect integer recieved. Should be between 0 and 3.");
                 throw new RuntimeException("Incorrect integer recieved.");
         }
-        switch(decordedRecord.get("type")){
+        switch(recordType){
                     // Type A
                     case "1":
                         A_info.add(decordedRecord);
@@ -660,14 +224,14 @@ public class DNSResponse extends DNSQuery{
     // Resolving qname when called
     // calling parameter: globalPointer
     private static String resolveQNAME(int pointer, String responseStr){
-
+        System.out.println("At resolveQNAME: " + pointer);
         String qname = "";
         // Get the two bits for number of letter
         // Convert the numerStr to int
         String tempStr = responseStr.substring(pointer, pointer+2);
         int temp = Integer.parseInt(tempStr, 16);
         // Compressed pointer
-        if(tempStr.equals("C0")){
+        if(tempStr.equals("C0") || tempStr.equals("C1")){
             String compressedMessage = compressedReferece(pointer, responseStr, qname);
             qname = compressedMessage;
             pointer+=4;
@@ -682,15 +246,19 @@ public class DNSResponse extends DNSQuery{
             }
             qname+=".";
             pointer+=2;
-            // tempStr = responseStr.substring(pointer, pointer+2);
-            // temp = Integer.parseInt(tempStr, 16)*2;
-            // String compressedMessage = compressedReferece(pointer, responseStr, qname);
-            // qname += compressedMessage;
-            // pointer+=4;
-        }      
 
+            // C0 after
+            tempStr = responseStr.substring(pointer, pointer+2);
+            if(tempStr.equals("C0") || tempStr.equals("C1")){
+                String compressedMessage = compressedReferece(pointer, responseStr, qname);
+                qname += compressedMessage;
+                pointer+=4;
+            }
+        }      
+        
         globalPointer=pointer;
         qname = qname.substring(0, qname.length() - 1);
+        System.out.println("At resolveQNAME: " + qname);
         return qname;
     }
 
@@ -743,7 +311,7 @@ public class DNSResponse extends DNSQuery{
                 for(int i=0; i < rDataLength; i++){
                     String letterCountStr = response.substring(pointer, pointer+2);
                     int letterCount = Integer.parseInt(letterCountStr, 16);
-                    if(letterCountStr.equals("C0")){
+                    if(letterCountStr.equals("C0") || letterCountStr.equals("C1")){
                         String compressedMessage = compressedReferece(pointer, response, Rdata);
                         Rdata = compressedMessage;
                         Rdata += "."; 
@@ -761,6 +329,13 @@ public class DNSResponse extends DNSQuery{
                         pointer+=READING_OFFSET;
                     }         
                 }
+                // String temp = response.substring(pointer, pointer+2);
+                // System.out.println(temp);
+                // if(temp.equals("00")){
+                //     System.out.println("Susddhauwhdiuahwduia");
+                //     pointer+=READING_OFFSET;
+                // }
+
                 Rdata = Rdata.substring(0, Rdata.length() - 1); 
         } else if(recordtype.equals("1")){
                 // CLASS A (1)
