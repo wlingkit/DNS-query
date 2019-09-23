@@ -8,14 +8,12 @@ public class DNSQuery{
     
     private static Random random = new Random();
     public static String rand_id = "";
-    public static String query_parameters = "";
-    public static String num_of_questions = "0001";
-    public static String num_of_answers = "0000";
-    public static String authority_records = "0000";
-    public static String additional_records = "0000";
+    private static String query_parameters = "";
+    private static String NUM_OF_QUESTIONS = "0001";
+    private static String NUM_OF_ANSWERS = "0000";
+    private static String NUM_AUTHORITY_RECORDS = "0000";
+    private static String NUM_ADDITIONAL_RECORDS = "0000";
     public static String qnameStr = "";
-    public static String message = "";
-    public static String qtype = "";
 
        // Encoding message for send up
     // Message structure: message = "AA AA |01 00           |  00 01  | 00 00 |00 00            |00 00              |07 65 78 61 6d 70 6c 65 03 63 6f 6d 00| 00 01| 00 01"
@@ -27,7 +25,7 @@ public class DNSQuery{
     
     // Same     Same     Changes    Changes same same changes                  changes  same
     public static byte[] encoding(DNSNode node){
-        message = "";
+        String message = "";
         // byte[] test_byte = {0x12, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01, 0x00, 0x01};
         // byte[] test_byte = {0x12, 0x12, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01, 0x00, 0x01};
         
@@ -91,6 +89,7 @@ public class DNSQuery{
         // Qtype - two bytes [00][.getType]
         String qtype_hexStr = qtype_encode(node);
         
+        String qtype = "";
         if(qtype_hexStr.length() == 1){
             qtype += "000" + qtype_hexStr;
         } else if(qtype_hexStr.length() == 2){
@@ -101,7 +100,8 @@ public class DNSQuery{
         String qclass = "0001";
 
         // Figure out now many bytes you need 16 + qname every letter is a byte
-        message = rand_id + query_parameters + num_of_questions + num_of_answers + authority_records + additional_records + qname + qtype + qclass;
+        message = rand_id + query_parameters + NUM_OF_QUESTIONS + NUM_OF_ANSWERS + NUM_AUTHORITY_RECORDS + NUM_ADDITIONAL_RECORDS + qname + qtype + qclass;
+        System.out.println(message);
         byte[] message_byteArray = ByteHelper.hexStringToByteArray(message);
 
         // String message = id_str + query_parameters + num_question + num_answer + authority_record + additional_record + qname + qtype + qclass;

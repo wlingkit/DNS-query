@@ -10,6 +10,7 @@ import java.net.UnknownHostException;
 import java.util.*;
 
 
+
 public class DNSLookupService {
 
     private static final int DEFAULT_DNS_PORT = 53;
@@ -178,7 +179,7 @@ public class DNSLookupService {
      *                         returns an empty set.
      * @return A set of resource records corresponding to the specific query requested.
      */
-    private static int resendCounter = 1;
+    private static int resendCounter = 0;
     private static Set<ResourceRecord> getResults(DNSNode node, int indirectionLevel){       
         System.out.println("Indirection level: " + indirectionLevel);
         
@@ -191,21 +192,25 @@ public class DNSLookupService {
         // 1. Call domain server with RootServer (node, rootServer)
         retrieveResultsFromServer(node, rootServer);
 
-         // 3. Check if response from an AA server
+        //IF LOOKING FOR CANME. DO EVERYTHING THE SAME UNTIL A CNAME IS FOUND. NEED AN IF STATEMENT TO CHECK IF ITS LOOKING FOR CNAME, IF SO. BREAK WHEN CNAME FOUND
+        // ONCE YOU FOUND ANOTHER IPV4, CHANGE BACK THE HOSTNAME
 
-        
-
-        // If a dead-end is found. This is when there is not A type info and server is not authoritative
-        // if(DNSResponse.answerRecord.isEmpty() && DNSResponse.nameServerRecord.isEmpty() && DNSResponse.additionalRecord.isEmpty() ){
-
-        // }
-        if(DNSResponse.A_info.isEmpty() && !DNSResponse.is_AA){
-            String nsStr = DNSResponse.NS_info.get(resendCounter).get("Rdata");
-            // DNSResponse.clearList();
-            // Make new node and resend message with it. With rootServer
-            DNSNode new_node = new DNSNode(nsStr, node.getType());
-            resendCounter = 1;
-            getResults(new_node, indirectionLevel+1);
+        // CASE TWO. NO A TYPE AND NOT AUTHORITATIVE
+        if(!DNSResponse.NS_info.isEmpty() && !DNSResponse.is_AA && DNSResponse.A_info.isEmpty()) {
+            indirectionLevel++;
+            String newIPv4Str = resolveDEADEND(node);
+            try{
+                InetAddress newIPv4 = InetAddress.getByName(newIPv4Str);
+                retrieveResultsFromServer(node, newIPv4);
+            } catch(Exception e){
+                System.out.println(e);
+            }
+            
+        } else if(!DNSResponse.CNAME_info.isEmpty()){
+        // CASE THREE. NO A AND NO NS. CHECK FOR CNAME
+            String newHost = DNSResponse.CNAME_info.get(0).get("Rdata");
+            DNSNode newNode = new DNSNode(newHost, node.getType());
+            getResults(newNode, indirectionLevel+1);
         }
         
         Set<ResourceRecord> ans = new HashSet<ResourceRecord>();
@@ -232,55 +237,54 @@ public class DNSLookupService {
         if(verboseTracing){
             FormatQueryTrace(node, server);
         }
-        System.out.println("-------------------Check point 1------------------------");
 
         // Sending request
+
         send_message(encoded_message, server, DEFAULT_DNS_PORT);
 
-        System.out.println("-------------------Check point 2------------------------");
+        
+
         // Recieving answer 
         DNSResponse.clearList();
         retrieve_message(node);
         if(verboseTracing){
-            System.out.println("-------------------Check point 6------------------------");
             FormatResponseTrace(node);
         }
-        System.out.println("-------------------Check point 7------------------------");
         // 4b. If not, check if there are IPv4 addresses. Grab one and resend message down the path.
-        // DOESNT HAVE NS OR DOESNT HAVE AA
-        if(!DNSResponse.is_AA && !DNSResponse.A_info.isEmpty()){
-            System.out.println("-------------------Check point 8------------------------");
-            String serverStr = DNSResponse.A_info.get(resendCounter).get("Rdata"); 
-            System.out.println("-------------------Check point 9------------------------");
-            // resend_counter++;      google.ca                      172800     A    185.159.196.2
-            try{
-                // Clear hash after the data has already been cached for new data
-                InetAddress new_server = InetAddress.getByName(serverStr);
-
-                retrieveResultsFromServer(node, new_server);
-
-            } catch(Exception e){
-                System.out.println(e);
+       
+        // CASE ONE
+        if(!DNSResponse.is_AA){
+            // Resend with different IPv4
+            if(!DNSResponse.A_info.isEmpty()){
+                String newAddress = DNSResponse.A_info.get(resendCounter).get("Rdata");
+                System.out.println(DNSResponse.A_info.get(0).get("Rdata"));
+                try{
+                    InetAddress newServer = InetAddress.getByName(newAddress);
+                    System.out.println(newServer);
+                    System.out.println(node.getHostName());
+                    System.out.println(node.getType());
+                    retrieveResultsFromServer(node, newServer);
+                } catch(Exception e){
+                    System.out.println(e);
+                }
             }
-        }
-        
+        }           
     }
 
     private static void FormatQueryTrace(DNSNode node, InetAddress server) {
         System.out.print("\n\n"); // begin with two blank lines
         RecordType qType = node.getType(); // convert type code to corresponding letter code (E.g 1 == A)
-        String queryFormat = String.format("Query ID     %s %s  %s --> %s", DNSQuery.rand_id, DNSQuery.qnameStr, qType, server);
+        String queryFormat = String.format("Query ID     %s %s  %s --> %s", DNSQuery.rand_id, DNSQuery.qnameStr, qType, server.getHostAddress());
         System.out.println(queryFormat);
        }
 
     private static void FormatResponseTrace(DNSNode node) {
-        // System.out.println("Query Id     " + qs.transID + " " + qs.lookupName + "  " + convertQType + " --> " + qs.DNSIA.getHostAddress()); // TODO???
+        // System.out.println("Query Id     " + qs.transID + " " + qs.lookupName + "  " + convertQType + " --> " + qs.DNSIA.getHostAddress()); 
         System.out.println("Response received after " + (endTime - startTime) / 1000. + " seconds " + "(" + (numTrys) + " retries)");
         String responseFormat = String.format("Response ID: %s Authoritative = %s", DNSQuery.rand_id, DNSResponse.is_AA);
         System.out.println(responseFormat);
 
-
-        // TODO 
+    
         System.out.printf("Answers [%s]\n", DNSResponse.numAnswer);
         for(int i=0; i < DNSResponse.answerRecord.size(); i++){
             ResourceRecord rrTemp = toResoureRecord(node, DNSResponse.answerRecord.get(i));
@@ -361,14 +365,11 @@ public class DNSLookupService {
             e.printStackTrace();  
             System.out.println("IOException at socket recieving");
         }
-        System.out.println("-------------------Check point 3------------------------");
         String responseStr = ByteHelper.bytesToHex(dp.getData());
 
-        System.out.println("-------------------Check point 4------------------------");
         System.out.println("Response String:");
         System.out.println(responseStr);
         DNSResponse.decoding(responseStr);
-        System.out.println("-------------------Check point 5------------------------");
         
 
         // 1. Get info from the big dict
@@ -404,5 +405,40 @@ public class DNSLookupService {
         String RdataStr = record.get("Rdata");
         ResourceRecord rr = new ResourceRecord(hostName, type, ttl, RdataStr);
         return rr;
+    }
+
+    private static String resolveCNAME(){
+        // TODO
+        return "";
+    }
+
+    private static String resolveDEADEND(DNSNode node){
+        // Make new node
+        // get ipv4
+        // 
+        String newHost = DNSResponse.NS_info.get(resendCounter).get("Rdata");
+        DNSNode newNode = new DNSNode(newHost, node.getType());
+        
+        byte[] encoded_message = DNSQuery.encoding(newNode);
+
+        if(verboseTracing){
+            FormatQueryTrace(newNode, rootServer);
+        }
+
+        // Sending request
+        send_message(encoded_message, rootServer, DEFAULT_DNS_PORT);
+
+        // Recieving answer 
+        DNSResponse.clearList();
+        retrieve_message(newNode);
+        if(verboseTracing){
+            FormatResponseTrace(newNode);
+        }
+       
+        
+        String newAddress = DNSResponse.A_info.get(resendCounter).get("Rdata");
+        
+        // Should return new IPv4? 
+        return newAddress;
     }
 }
