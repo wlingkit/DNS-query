@@ -12,7 +12,7 @@ public class DNSCache {
 
     private static DNSCache instance = new DNSCache();
 
-    private Map<DNSNode, Map<ResourceRecord, ResourceRecord>> cachedResults = new TreeMap<>();
+    private static Map<DNSNode, Map<ResourceRecord, ResourceRecord>> cachedResults = new TreeMap<>();
 
     /** Singleton retrieval method. Only one instance of the DNS cache can be created. This
      * method returns the single DNS cache instance.
@@ -31,7 +31,7 @@ public class DNSCache {
      * @param node DNS query (host name and record type) to obtain cached results.
      * @return A potentially empty set of resources associated to the query.
      */
-    public Set<ResourceRecord> getCachedResults(DNSNode node) {
+    public static Set<ResourceRecord> getCachedResults(DNSNode node) {
         Map<ResourceRecord, ResourceRecord> results = cachedResults.get(node);
         if (results == null)
             return Collections.emptySet();

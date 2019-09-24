@@ -55,6 +55,7 @@ public class DNSQuery{
 
         // Qname - Enough for name. Convert each letter to hex by itself
         qnameStr = node.getHostName();
+        System.out.println(qnameStr);
         // Split qname by "."
         String[] qnameArray = qnameStr.split("\\.");
 
@@ -73,7 +74,14 @@ public class DNSQuery{
         for(int i=0; i < qnameArray.length; i++){
             // Iterating through the string 
             // Converting the number of chars in a word into hex and byte
-            String amount_hexStr = "0" + Integer.toHexString(qnameArray[i].length());
+            String hexStr = Integer.toHexString(qnameArray[i].length());
+            String amount_hexStr = "";
+            if(hexStr.length() == 1){
+                amount_hexStr = "0" + hexStr;
+            } else {
+                amount_hexStr = hexStr;
+            }
+            
             qname += amount_hexStr;
 
             for(int j=0; j < qnameArray[i].length(); j++){
@@ -84,6 +92,8 @@ public class DNSQuery{
                 qname += char_hexStr;
             }
         }
+
+        System.out.println(qname);
         // Ending qname
         qname += "00";
 

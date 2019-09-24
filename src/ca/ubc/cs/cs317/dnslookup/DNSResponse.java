@@ -224,7 +224,6 @@ public class DNSResponse extends DNSQuery{
     // Resolving qname when called
     // calling parameter: globalPointer
     private static String resolveQNAME(int pointer, String responseStr){
-        System.out.println("At resolveQNAME: " + pointer);
         String qname = "";
         // Get the two bits for number of letter
         // Convert the numerStr to int
@@ -258,7 +257,6 @@ public class DNSResponse extends DNSQuery{
         
         globalPointer=pointer;
         qname = qname.substring(0, qname.length() - 1);
-        System.out.println("At resolveQNAME: " + qname);
         return qname;
     }
 

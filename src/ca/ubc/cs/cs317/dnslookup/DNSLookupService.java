@@ -188,6 +188,10 @@ public class DNSLookupService {
             System.err.println("Maximum number of indirection levels reached.");
             return Collections.emptySet();
         }
+        // Check cahce first
+        Set<ResourceRecord> tempCache = DNSCache.getCachedResults(node);
+        
+        
 
         // 1. Call domain server with RootServer (node, rootServer)
         retrieveResultsFromServer(node, rootServer);
@@ -254,19 +258,25 @@ public class DNSLookupService {
                     System.out.println(e);
                 }
             } else if(!DNSResponse.NS_info.isEmpty()){
-                String newIPv4Str = resolveDEADEND(node);
-            
-                System.out.println("-------------------2--------------------");
-                try{
-                    InetAddress newIPv4 = InetAddress.getByName(newIPv4Str);
-                    retrieveResultsFromServer(node, newIPv4);
-                } catch(Exception e){
-                    System.out.println(e);
-                }
-                
-                
+                // TODO Resolve deadend
+                // Take NS
+                // String newHostName = DNSResponse.NS_info.get(resendCounter).get("Rdata");
+                String newHost = DNSResponse.NS_info.get(resendCounter).get("Rdata");
+                DNSNode newNode = new DNSNode(newHost, node.getType());
+
+                String newIPv4Str = resolveDEADEND(newNode, rootServer);
+                DNSResponse.is_AA = false;
+                    System.out.println("-------------------" + newIPv4Str + "--------------------");
+                    try{
+                        InetAddress newIPv4 = InetAddress.getByName(newIPv4Str);
+                        retrieveResultsFromServer(node, newIPv4);
+                    } catch(Exception e){
+                        System.out.println(e);
+                    }
             }
-        }           
+                        
+        }
+                
     }
 
     private static void FormatQueryTrace(DNSNode node, InetAddress server) {
@@ -414,57 +424,48 @@ public class DNSLookupService {
         return "";
     }
 
-    private static String resolveDEADEND(DNSNode node){
-        // Make new node
-        // get ipv4
-        System.out.println("-------------------4------------------------");
-        String newHost = DNSResponse.NS_info.get(resendCounter).get("Rdata");
-        DNSNode newNode = new DNSNode(newHost, node.getType());
-        
-        byte[] encoded_message = DNSQuery.encoding(newNode);
+    // Youre here becuase of a dead end
+    // That means theres a NS -> A new hostname (ns1.googke.com), and will use the rootServer to start
+    private static String resolveDEADEND(DNSNode node, InetAddress server){
+        String newAddress = "";
 
+        byte[] encoded_message = DNSQuery.encoding(node);
         if(verboseTracing){
-            FormatQueryTrace(newNode, rootServer);
+            FormatQueryTrace(node, server);
         }
 
         // Sending request
-        send_message(encoded_message, rootServer, DEFAULT_DNS_PORT);
+        send_message(encoded_message, server, DEFAULT_DNS_PORT);
 
         // Recieving answer 
         DNSResponse.clearList();
-        retrieve_message(newNode);
+        retrieve_message(node);
         if(verboseTracing){
-            FormatResponseTrace(newNode);
+            FormatResponseTrace(node);
         }
-        if(!DNSResponse.is_AA){
-            // Resend with different IPv4
-            if(!DNSResponse.A_info.isEmpty()){
-                System.out.println("-------------------5--------------------");
-                String newAddress = DNSResponse.A_info.get(resendCounter).get("Rdata");
-                try{
-                    InetAddress newServer = InetAddress.getByName(newAddress);
-                    retrieveResultsFromServer(node, newServer);
-                } catch(Exception e){
-                    System.out.println(e);
-                }
-            } else if(!DNSResponse.NS_info.isEmpty()){
-                String newIPv4Str = resolveDEADEND(node);
-            
-                System.out.println("-------------------6--------------------");
-                try{
-                    InetAddress newIPv4 = InetAddress.getByName(newIPv4Str);
-                    retrieveResultsFromServer(node, newIPv4);
-                } catch(Exception e){
-                    System.out.println(e);
-                }
-                
-                
+        System.out.println("*********************************************");
+    // If is_AA and there's an answer. Set this to newAddress and return
+        if(DNSResponse.is_AA && !DNSResponse.authoritativeAnswers.isEmpty()){
+            newAddress = DNSResponse.authoritativeAnswers.get(0).get("Rdata");
+            System.out.println("newAddress: " + newAddress);
+            System.out.println("-------------------------------------------------------------");
+            return newAddress;
+        } else {
+            String newTempServerStr = DNSResponse.A_info.get(0).get("Rdata");
+            System.out.println("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
+            try{
+                InetAddress newTempServer = InetAddress.getByName(newTempServerStr);
+                newAddress = resolveDEADEND(node, newTempServer);
+                return newAddress;
+            } catch(Exception e){
+                System.out.println(e);
             }
-        }  
-        
-        String newAddress = DNSResponse.A_info.get(resendCounter).get("Rdata");
-        
-        // Should return new IPv4? 
-        return newAddress;
+            
+        }
+    // So either way, resend with same host name until you find an answer
+    // If you get A file but none with the same qname // else if there is an ip with same host name
+    // resend message with same hostname but a server from A_info
+    // resend message with same hostname but a server from A_info
+        return "ERROR in resolveDEADEND. Should not be here";
     }
 }
