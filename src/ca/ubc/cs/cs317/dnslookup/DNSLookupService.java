@@ -189,7 +189,18 @@ public class DNSLookupService {
             return Collections.emptySet();
         }
         // Check cahce first
-        Set<ResourceRecord> tempCache = DNSCache.getCachedResults(node);
+        Set<ResourceRecord> cacheResults = DNSCache.getCachedResults(node);
+        if (!cacheResults.isEmpty()) {
+        return cacheResults;
+        }
+        // Set<ResourceRecord> tempCache = DNSCache.getCachedResults(node);
+        // for(int i=0; i < tempCache.size(); i++){
+        //     BiConsumer<DNSNode, ResourceRecord> checkCahce = (node, tempCache) -> {
+        //         // Check if theres an asnwer with the same node 
+        //         return node;
+        //     };
+        //     DNSCache.getInstance().forEachRecord(checkCahce);
+        // }
         
         
 
