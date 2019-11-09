@@ -214,7 +214,6 @@ public class DNSLookupService {
         if(!DNSResponse.CNAME_info.isEmpty() && DNSResponse.NS_info.isEmpty() && DNSResponse.A_info.isEmpty()){
         // CASE THREE. NO A AND NO NS. CHECK FOR CNAME
         
-            System.out.println("-------------------3--------------------");
             String newHost = DNSResponse.CNAME_info.get(0).get("Rdata");
             DNSNode newNode = new DNSNode(newHost, node.getType());
             getResults(newNode, indirectionLevel+1);
@@ -260,7 +259,6 @@ public class DNSLookupService {
         if(!DNSResponse.is_AA){
             // Resend with different IPv4
             if(!DNSResponse.A_info.isEmpty()){
-                System.out.println("-------------------1--------------------");
                 String newAddress = DNSResponse.A_info.get(resendCounter).get("Rdata");
                 try{
                     InetAddress newServer = InetAddress.getByName(newAddress);
@@ -277,7 +275,7 @@ public class DNSLookupService {
 
                 String newIPv4Str = resolveDEADEND(newNode, rootServer);
                 DNSResponse.is_AA = false;
-                    System.out.println("-------------------" + newIPv4Str + "--------------------");
+                    // System.out.println("-------------------" + newIPv4Str + "--------------------");
                     try{
                         InetAddress newIPv4 = InetAddress.getByName(newIPv4Str);
                         retrieveResultsFromServer(node, newIPv4);
@@ -390,8 +388,8 @@ public class DNSLookupService {
         }
         String responseStr = ByteHelper.bytesToHex(dp.getData());
 
-        System.out.println("Response String:");
-        System.out.println(responseStr);
+        // System.out.println("Response String:");
+        // System.out.println(responseStr);
         DNSResponse.decoding(responseStr);
         
 
@@ -454,16 +452,13 @@ public class DNSLookupService {
         if(verboseTracing){
             FormatResponseTrace(node);
         }
-        System.out.println("*********************************************");
     // If is_AA and there's an answer. Set this to newAddress and return
         if(DNSResponse.is_AA && !DNSResponse.authoritativeAnswers.isEmpty()){
             newAddress = DNSResponse.authoritativeAnswers.get(0).get("Rdata");
-            System.out.println("newAddress: " + newAddress);
-            System.out.println("-------------------------------------------------------------");
+            // System.out.println("newAddress: " + newAddress);
             return newAddress;
         } else {
             String newTempServerStr = DNSResponse.A_info.get(0).get("Rdata");
-            System.out.println("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
             try{
                 InetAddress newTempServer = InetAddress.getByName(newTempServerStr);
                 newAddress = resolveDEADEND(node, newTempServer);
